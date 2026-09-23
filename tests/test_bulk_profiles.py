@@ -53,6 +53,7 @@ class Environment:
             'EMP-A': Doc(company='Company A', employee_name='Alice', custom_ptkp='TK/0', date_of_joining='2026-01-01'),
             'EMP-B': Doc(company='Company B', employee_name='Bob', custom_ptkp='K/1', date_of_joining='2026-01-01'),
         }
+        self.fiscal_years = {f'FY-{year}': Doc(name=f'FY-{year}', year_start_date=f'{year}-01-01', year_end_date=f'{year}-12-31', disabled=0, companies=[]) for year in (2024,2025,2026,2027)}
         self.frappe = types.ModuleType('frappe')
         self.frappe.whitelist = lambda: lambda fn: fn
         self.frappe.validate_and_sanitize_search_inputs = lambda fn: fn
@@ -71,7 +72,8 @@ class Environment:
             'frappe.model.document': docmod, 'frappe_hr_pph21.setup': setup})
         self.patcher.start()
         self.queries = load('bulk_queries_test', 'frappe_hr_pph21/queries.py')
-        self.query_patcher = patch.dict(sys.modules, {'frappe_hr_pph21.queries': self.queries})
+        self.fiscal = load('fiscal_year_test', 'frappe_hr_pph21/fiscal_year.py')
+        self.query_patcher = patch.dict(sys.modules, {'frappe_hr_pph21.queries': self.queries, 'frappe_hr_pph21.fiscal_year': self.fiscal})
         self.query_patcher.start()
         self.profile_cls = load('bulk_profile_test', 'frappe_hr_pph21/frappe_hr_pph21/doctype/pph21_employee_tax_profile/pph21_employee_tax_profile.py').PPh21EmployeeTaxProfile
         self.bulk_cls = load('bulk_controller_test', 'frappe_hr_pph21/frappe_hr_pph21/doctype/bulk_pph21_employee_tax_profile/bulk_pph21_employee_tax_profile.py').BulkPPh21EmployeeTaxProfile
@@ -81,6 +83,7 @@ class Environment:
     def get_doc(self, dt, name, **kw):
         if kw.get('for_update'): self.read_locks.append((dt,name))
         if dt == 'Employee': return self.employees[name]
+        if dt == 'Fiscal Year': return self.fiscal_years[name]
         if dt == PROFILE: return self.profile_cls(copy.deepcopy(self.profiles[name]))
         raise AssertionError(dt)
     def exists(self, dt, filters):
@@ -95,7 +98,7 @@ class Environment:
         self.query = kwargs
         return [Box(name='Gaji Pokok',salary_component_abbr='GP',type='Earning')]
     def batch(self, names=('EMP-A','EMP-B')):
-        return self.bulk_cls(default_tax_year=2026, default_method='Gross Up', docstatus=0,
+        return self.bulk_cls(default_fiscal_year='FY-2026', default_method='Gross Up', docstatus=0,
             confirm_standard_assumptions=1, employees=[Box(idx=i,employee=name,tax_id='1234567890123456') for i,name in enumerate(names,1)])
     def submit(self, doc):
         doc.before_validate(); doc.validate(); doc.docstatus=1; doc.before_submit()
@@ -136,7 +139,7 @@ class BulkProfileTest(unittest.TestCase):
     def test_same_employee_different_years_allowed(self):
         batch = self.env.batch(('EMP-A','EMP-A'))
         self.env.employees['EMP-A'].date_of_joining='2025-01-01'
-        batch.employees[1].tax_year=2025
+        batch.employees[1].fiscal_year='FY-2025'
         self.env.submit(batch)
         self.assertEqual(len(self.env.profiles),2)
 
@@ -158,7 +161,8 @@ class BulkProfileTest(unittest.TestCase):
         batch=self.env.batch(); self.env.submit(batch)
         self.assertEqual(len(self.env.profiles),2)
         profile=self.env.profiles['EMP-A-2026']
-        for key in ('tax_identity_validated','resident_full_year','permanent_employee'): self.assertEqual(profile[key],1)
+        for key in ('resident_full_year','permanent_employee'): self.assertEqual(profile[key],1)
+        self.assertEqual(profile['tax_identity_validated'],0)
         self.assertEqual(profile['facility'],'Normal')
         self.assertEqual(profile['opening_gross'],0)
         self.assertEqual(profile['ter_category'],'A')
@@ -221,6 +225,116 @@ class BulkProfileTest(unittest.TestCase):
         self.env.frappe.has_permission = lambda dt, perm, doc, user: doc != 'EMP-B'
         self.assertFalse(self.env.queries.bulk_profile_permission(self.env.batch(), user='limited'))
         self.assertTrue(self.env.queries.bulk_profile_permission(self.env.batch(('EMP-A',)), user='limited'))
+
+
+    def test_fiscal_year_uses_master_dates_not_record_name_or_client_number(self):
+        master = self.env.fiscal_years.pop('FY-2026')
+        master.name = 'Periode Payroll PUP'
+        self.env.fiscal_years[master.name] = master
+        batch = self.env.batch(('EMP-A',))
+        batch.default_fiscal_year = master.name
+        batch.default_tax_year = 1900
+        batch.employees[0].fiscal_year = master.name
+        batch.employees[0].tax_year = 1900
+        self.env.submit(batch)
+        self.assertEqual(batch.default_tax_year, 2026)
+        self.assertEqual(batch.employees[0].tax_year, 2026)
+        self.assertIn('EMP-A-2026', self.env.profiles)
+
+    def test_individual_autoname_resolves_year_before_normal_validation(self):
+        profile = self.env.profile_cls(employee='EMP-A', fiscal_year='FY-2026', ptkp_status='TK/0')
+        profile.autoname()
+        self.assertEqual(profile.name, 'EMP-A-2026')
+
+    def test_fiscal_year_required_disabled_noncalendar_and_unsupported_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'Pilih Fiscal Year'):
+            self.env.fiscal.tax_year_from_fiscal_year('')
+        self.env.fiscal_years['FY-2026'].disabled = 1
+        with self.assertRaisesRegex(ValueError, 'tidak aktif'):
+            self.env.fiscal.tax_year_from_fiscal_year('FY-2026')
+        self.env.fiscal_years['FY-2026'].disabled = 0
+        self.env.fiscal_years['FY-2026'].year_start_date = '2026-04-01'
+        with self.assertRaisesRegex(ValueError, '1 Januari'):
+            self.env.fiscal.tax_year_from_fiscal_year('FY-2026')
+        with self.assertRaisesRegex(ValueError, '2024-2026'):
+            self.env.fiscal.tax_year_from_fiscal_year('FY-2027')
+
+    def test_fiscal_year_company_and_read_permissions_enforced(self):
+        fy = self.env.fiscal_years['FY-2026']
+        fy.companies = [Box(company='Company A')]
+        self.assertEqual(self.env.fiscal.tax_year_from_fiscal_year(fy.name, 'Company A'),2026)
+        with self.assertRaisesRegex(ValueError, 'Company'):
+            self.env.submit(self.env.batch())
+        self.assertEqual(self.env.profiles,{})
+        fy.denied = True
+        with self.assertRaises(PermissionError): self.env.fiscal.tax_year_from_fiscal_year(fy.name)
+
+    def test_empty_identity_is_allowed_and_not_marked_verified(self):
+        batch = self.env.batch(('EMP-A',))
+        batch.employees[0].tax_id = '   '
+        self.env.submit(batch)
+        profile = self.env.profiles['EMP-A-2026']
+        self.assertEqual(profile['tax_id'],'')
+        self.assertEqual(profile['tax_identity_validated'],0)
+        individual = self.env.get_doc(PROFILE,'EMP-A-2026')
+        individual.tax_identity_validated = 1
+        individual.save()
+        self.assertEqual(individual.tax_identity_validated,0)
+
+    def test_empty_bulk_identity_preserves_existing_identity(self):
+        self.env.submit(self.env.batch(('EMP-A',)))
+        batch = self.env.batch(('EMP-A',))
+        batch.employees[0].tax_id = ''
+        self.env.submit(batch)
+        self.assertEqual(self.env.profiles['EMP-A-2026']['tax_id'],'1234567890123456')
+        self.assertEqual(batch.employees[0].result,'Tidak berubah')
+
+    def test_changed_identity_is_not_automatically_verified(self):
+        self.env.submit(self.env.batch(('EMP-A',)))
+        self.env.profiles['EMP-A-2026']['tax_identity_validated'] = 1
+        batch = self.env.batch(('EMP-A',))
+        batch.employees[0].tax_id = '0123456789012345'
+        self.env.submit(batch)
+        self.assertEqual(self.env.profiles['EMP-A-2026']['tax_id'],'0123456789012345')
+        self.assertEqual(self.env.profiles['EMP-A-2026']['tax_identity_validated'],0)
+
+    def test_legacy_row_different_year_requires_explicit_fiscal_year(self):
+        batch = self.env.batch(('EMP-A',))
+        batch.employees[0].tax_year = 2025
+        with self.assertRaisesRegex(ValueError,'profil lama'): batch.before_validate()
+
+    def test_fiscal_year_backfill_preserves_values_and_skips_ambiguity(self):
+        self.env.submit(self.env.batch(('EMP-A',)))
+        profile = self.env.profiles['EMP-A-2026']
+        del profile['fiscal_year']
+        before = copy.deepcopy(profile)
+        updates=[]
+        def all_records(dt, **kwargs):
+            if dt == 'Fiscal Year': return list(self.env.fiscal_years)
+            if dt == PROFILE: return [Box(p) for p in self.env.profiles.values() if not p.get('fiscal_year')]
+            return []
+        def set_value(dt, name, field, value, **kwargs):
+            self.assertFalse(kwargs['update_modified'])
+            self.env.profiles[name][field] = value
+            updates.append((name,field,value))
+        self.env.frappe.get_all = all_records
+        self.env.frappe.db.set_value = set_value
+        self.env.fiscal_years['Other'] = Doc(self.env.fiscal_years['FY-2026'])
+        self.env.fiscal_years['Other'].name = 'Other'
+        self.env.fiscal.backfill_fiscal_year_links()
+        self.assertEqual(updates,[])
+        del self.env.fiscal_years['Other']
+        self.env.fiscal.backfill_fiscal_year_links()
+        self.assertEqual(profile['fiscal_year'],'FY-2026')
+        self.assertEqual({k:v for k,v in profile.items() if k!='fiscal_year'},before)
+        self.env.fiscal.backfill_fiscal_year_links()
+        self.assertEqual(len(updates),1)
+
+    def test_register_filter_resolves_master_year(self):
+        self.env.frappe._dict = Box
+        report = load('register_fiscal_test','frappe_hr_pph21/frappe_hr_pph21/report/pph21_register/pph21_register.py')
+        report.execute({'company':'Company A','fiscal_year':'FY-2026'})
+        self.assertEqual(self.env.query['filters']['pph21_tax_year'],2026)
 
 
 if __name__ == '__main__': unittest.main()

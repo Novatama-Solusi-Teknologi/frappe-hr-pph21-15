@@ -1,12 +1,14 @@
 import frappe
+from frappe_hr_pph21.fiscal_year import tax_year_from_fiscal_year
 
 
 def execute(filters=None):
     filters = frappe._dict(filters or {})
     frappe.only_for(("HR Manager", "System Manager"))
-    if not filters.company or not filters.tax_year:
-        frappe.throw("Pilih Company dan Tahun Pajak.")
-    query = {"company": filters.company, "pph21_tax_year": int(filters.tax_year), "docstatus": 1,
+    if not filters.company or not filters.fiscal_year:
+        frappe.throw("Pilih Company dan Fiscal Year.")
+    tax_year = tax_year_from_fiscal_year(filters.fiscal_year, filters.company)
+    query = {"company": filters.company, "pph21_tax_year": tax_year, "docstatus": 1,
              "pph21_tax_profile": ["is", "set"]}
     if filters.get("month"):
         query["pph21_tax_month"] = int(filters.month)

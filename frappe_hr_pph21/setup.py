@@ -39,6 +39,8 @@ def after_migrate():
     sync_custom_fields()
     create_components()
     sync_mapping_codes()
+    from frappe_hr_pph21.fiscal_year import backfill_fiscal_year_links
+    backfill_fiscal_year_links()
 
 
 def sync_mapping_codes():

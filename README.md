@@ -1,6 +1,6 @@
 # Frappe HR PPh21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.2.0**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.3.0**, kandidat untuk uji staging.
 
 Nama tampilan: **Frappe HR PPh21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -21,11 +21,17 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
 
-## Baru di 0.2.0
+## Baru di 0.3.0
+
+Tahun dipilih dari DocType **Fiscal Year**, bukan diketik sebagai angka. Tahun internal
+diambil dari periode Januari-Desember. **NIK/NPWP opsional** pada profil dan bulk;
+identitas kosong tidak memblokir payroll Normal. [Panduan upgrade 0.3.0](docs/UPGRADE_0_3.md).
+
+## Form dan bulk profile
 
 Form 2-3 kolom, kode komponen pada mapping, filter akun per Company, dan
 [Bulk PPh21 Employee Tax Profile](docs/BULK_PROFILE.md) dengan default PTKP dari Employee.
-Untuk site yang sudah terpasang, ikuti [panduan upgrade](docs/UPGRADE_0_2.md).
+Untuk site yang sudah terpasang, ikuti [panduan upgrade](docs/UPGRADE_0_3.md).
 
 ## Memasang ke Frappe Cloud
 
@@ -64,7 +70,7 @@ App memblokir instalasi bila major version tidak cocok atau ada app lain yang ov
 Buka workspace **Frappe HR PPh21** sebagai **HR Manager** atau **System Manager**:
 
 1. Buat `PPh21 Settings`: perusahaan, akun beban tunjangan, akun utang pajak, dan pemetaan seluruh komponen.
-2. Buat `PPh21 Employee Tax Profile` per pegawai/tahun, isi PTKP, identitas pajak valid, Gross Up/Gross,
+2. Buat `PPh21 Employee Tax Profile` per pegawai/tahun, pilih Fiscal Year, isi PTKP, NIK/NPWP jika tersedia, Gross Up/Gross,
    dan saldo awal bila mulai di tengah tahun.
 3. Aktifkan `PPh21 Enabled` pada Employee serta pengaturan perusahaan.
 4. Jalankan payroll biasa. App menambahkan komponen pajak ke slip secara otomatis.
@@ -73,11 +79,11 @@ Buka workspace **Frappe HR PPh21** sebagai **HR Manager** atau **System Manager*
 Detail pemetaan BPJS, contoh setup, jurnal, dan saldo awal ada di [KONFIGURASI.md](docs/KONFIGURASI.md).
 Panduan langkah demi langkah dengan kasus taxable/nonobjek, Gross/Gross Up, BPJS, THR,
 dan masa terakhir ada di [STUDI_KASUS_PAYROLL.md](docs/STUDI_KASUS_PAYROLL.md).
-Versi siap baca/cetak: [Panduan PDF 0.2.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
+Versi siap baca/cetak: [Panduan PDF 0.3.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
 
-## Batas rilis 0.2.0
+## Batas rilis 0.3.0
 
-- Pegawai tetap untuk tujuan PPh 21, WP dalam negeri sepanjang tahun, identitas pajak valid untuk tarif normal.
+- Pegawai tetap untuk tujuan PPh 21, WP dalam negeri sepanjang tahun, fasilitas Normal. NIK/NPWP opsional; app tetap memakai tarif Normal.
 - Tahun yang dibundel: **2024–2026**. Tahun lain diblokir sampai master diperbarui.
 - **Satu Salary Slip per pegawai/perusahaan/bulan kalender.** THR/bonus melalui Additional Salary ke slip tersebut.
   Gaji dan THR dalam dua slip terpisah/off-cycle belum didukung. Tidak mengubah transaksi lama otomatis.

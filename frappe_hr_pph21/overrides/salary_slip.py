@@ -103,8 +103,6 @@ class PPh21SalarySlip(SalarySlip):
                                  for_update=bool(getattr(self, "_pph21_locked", False)))
         if not profile.permanent_employee or not profile.resident_full_year or profile.facility != "Normal":
             frappe.throw("Profil pajak di luar cakupan rilis: pegawai tetap, WP DN sepanjang tahun, fasilitas Normal.")
-        if not profile.get("tax_identity_validated"):
-            frappe.throw("Profil belum memiliki identitas pajak tervalidasi untuk tarif normal.")
         if start.month <= cint(profile.opening_through_month):
             frappe.throw("Masa ini sudah dicakup saldo awal; tidak boleh dihitung dua kali.")
         return settings, profile, start, end, employee

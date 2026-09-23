@@ -3,26 +3,31 @@ import re
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import cint, getdate
+from frappe.utils import cint
 
 from frappe_hr_pph21.queries import employee_values
 from frappe_hr_pph21.tax.rules import PTKP, SUPPORTED_YEARS
+from frappe_hr_pph21.fiscal_year import tax_year_from_fiscal_year
 
 PROFILE = 'PPh21 Employee Tax Profile'
 
 
 class BulkPPh21EmployeeTaxProfile(Document):
     def before_validate(self):
-        self.default_tax_year = cint(self.default_tax_year) or getdate().year
+        self.default_tax_year = tax_year_from_fiscal_year(self.default_fiscal_year)
         self.default_method = self.default_method or 'Gross Up'
         for row in self.employees:
-            row.tax_year = cint(row.tax_year) or self.default_tax_year
+            if not row.fiscal_year and row.tax_year and cint(row.tax_year) != self.default_tax_year:
+                frappe.throw(f'Baris {row.idx}: pilih Fiscal Year sesuai tahun profil lama.')
+            row.fiscal_year = row.fiscal_year or self.default_fiscal_year
             row.method = row.method or self.default_method
             if row.employee:
                 values = employee_values(row.employee)
                 row.company = values['company']
                 row.employee_name = values['employee_name']
                 row.ptkp_status = row.ptkp_status or values['ptkp_status']
+            row.tax_year = tax_year_from_fiscal_year(row.fiscal_year, row.company)
+            row.tax_id = (row.tax_id or '').strip()
 
     def validate(self):
         if not 1 <= len(self.employees) <= 200:
@@ -42,7 +47,7 @@ class BulkPPh21EmployeeTaxProfile(Document):
                 frappe.throw(f'Baris {row.idx}: pilih PTKP yang valid; custom_ptkp kosong/tidak dikenali perlu diisi manual.')
             if row.method not in ('Gross', 'Gross Up'):
                 frappe.throw(f'Baris {row.idx}: pilih Gross atau Gross Up.')
-            if not re.fullmatch(r'[0-9]{15,16}', re.sub(r'[ .-]', '', row.tax_id or '')):
+            if row.tax_id and not re.fullmatch(r'[0-9]{15,16}', re.sub(r'[ .-]', '', row.tax_id)):
                 frappe.throw(f'Baris {row.idx}: NIK/NPWP harus 15 atau 16 digit.')
             # Draft result columns are not accepted as evidence that a profile was processed.
             if self.docstatus == 0:
@@ -73,11 +78,15 @@ class BulkPPh21EmployeeTaxProfile(Document):
         row.employee_name = values['employee_name']
         existing = frappe.db.exists(PROFILE, {'employee': row.employee, 'tax_year': row.tax_year})
         fields = dict(employee=row.employee, company=row.company, tax_year=row.tax_year,
-                      tax_id=row.tax_id, ptkp_status=row.ptkp_status, method=row.method)
+                      fiscal_year=row.fiscal_year, ptkp_status=row.ptkp_status, method=row.method)
+        if row.tax_id:
+            fields['tax_id'] = row.tax_id
         if existing:
             profile = frappe.get_doc(PROFILE, existing, for_update=True)
             profile.check_permission('read')
             profile.check_permission('write')
+            if row.tax_id and row.tax_id != profile.tax_id:
+                fields['tax_identity_validated'] = 0
             if any(profile.get(key) != value for key, value in fields.items()):
                 # Normal validation protects profiles referenced by submitted Salary Slips.
                 # Opening balances and all fields outside the five bulk inputs remain unchanged.
@@ -89,7 +98,7 @@ class BulkPPh21EmployeeTaxProfile(Document):
         else:
             profile = frappe.new_doc(PROFILE)
             profile.update(fields)
-            profile.update(dict(tax_identity_validated=1, resident_full_year=1,
+            profile.update(dict(tax_identity_validated=0, resident_full_year=1,
                                 permanent_employee=1, facility='Normal', opening_through_month=0,
                                 opening_gross=0, opening_allowance=0, opening_deductions=0, opening_tax=0))
             profile.insert()

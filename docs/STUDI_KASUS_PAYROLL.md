@@ -1,21 +1,21 @@
 # Panduan PPh21 payroll: konfigurasi dan studi kasus
 
-Untuk PT PUP — ERPNext/Frappe HR v15, app **Frappe HR PPh21 0.2.0**.
+Untuk PT PUP — ERPNext/Frappe HR v15, app **Frappe HR PPh21 0.3.0**.
 Disusun 23 September 2026. Semua contoh angka dihitung menggunakan mesin app.
 Panduan ini mengasumsikan app sudah terpasang; pengujian transaksi nyata tetap dilakukan
-di staging sebagaimana [UAT](UAT.md). Rilis 0.2.0 menambahkan bulk profile dan layout form tanpa mengubah mesin pajak.
+di staging sebagaimana [UAT](UAT.md). Rilis 0.3.0 menggunakan master Fiscal Year dan NIK/NPWP opsional; rumus pajak tetap sama.
 
-## Pembaruan form dan bulk profile di 0.2.0
+## Pembaruan form dan bulk profile di 0.3.0
 
 - Form Settings/profil individual memakai 2-3 kolom; tabel tetap lebar penuh.
 - Mapping menampilkan nama dan kode Salary Component Abbreviation; pencarian menerima keduanya.
 - Pilihan akun mengikuti Company, jenis akun, IDR, aktif, dan non-group.
 - Gunakan [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md) untuk mengisi banyak karyawan
-  dalam satu form: Employee, tahun, NIK/NPWP, PTKP, metode. Company otomatis; PTKP
+  dalam satu form: Employee, Fiscal Year, NIK/NPWP opsional, PTKP, metode. Company otomatis; PTKP
   default dari `custom_ptkp` jika tersedia. Save menyimpan draft; Submit menerapkan seluruh batch.
 - Konfirmasi persyaratan standar sekali per batch. Profil baru memakai Normal dan saldo awal nol;
   profil lama mempertahankan saldo awal. PPh21 Enabled pada Employee tidak diubah otomatis.
-- Panduan deploy pembaruan: [UPGRADE_0_2.md](UPGRADE_0_2.md).
+- Panduan deploy pembaruan: [UPGRADE_0_3.md](UPGRADE_0_3.md).
 
 ## 1. Bedakan objek pajak dan penanggung pajak
 
@@ -37,7 +37,7 @@ memakai salah satunya. Metode ditentukan per pegawai/tahun; mapping berlaku per 
 "Sebagian taxable" harus mempunyai dasar klasifikasi yang benar. Gaji biasa tidak boleh
 dibuat hanya 80% taxable atas pilihan perusahaan. Pisahkan komponen sesuai sifat transaksi.
 Jika maksudnya perusahaan menanggung 50% pajak atau hanya meng-gross-up gaji pokok,
-**gross-up sebagian belum didukung versi 0.2.0**.
+**gross-up sebagian belum didukung versi 0.3.0**.
 
 ## 2. Konfigurasi awal
 
@@ -95,9 +95,10 @@ sendiri. Jangan memasang komponen income tax lama/native bersamaan untuk pegawai
 ### C. Profil pegawai
 
 1. Cari `PPh21 Employee Tax Profile`, buat satu profil per Employee/tahun.
-2. Isi Employee, Tahun Pajak, NIK/NPWP, dan Status PTKP berdasarkan data HR.
-3. Konfirmasikan `NIK/NPWP valid untuk tarif normal` hanya setelah datanya tervalidasi.
-   Checkbox ini bukan validasi online DJP.
+2. Isi Employee, pilih **Fiscal Year** dari master ERPNext, dan pilih Status PTKP.
+   Angka tahun otomatis berasal dari periode Januari-Desember pada master.
+3. NIK/NPWP boleh kosong; jika diisi harus 15/16 digit. Checkbox verifikasi identitas
+   hanya catatan manual, bukan syarat penyimpanan/payroll dan bukan validasi online DJP.
 4. Pilih **Metode PPh 21 = Gross** atau **Gross Up**. Default app adalah Gross Up;
    ubah secara eksplisit bila pajak menjadi beban pegawai.
 5. Konfirmasikan pegawai tetap untuk tujuan PPh21 dan WP dalam negeri sepanjang tahun
@@ -297,8 +298,8 @@ Periksa baris gaji, bruto pajak, tunjangan, potongan, dan Net Pay. Buka **Kertas
 pada Salary Slip. Setelah submit, periksa **PPh21 Register** dan jurnal Payroll Entry.
 Lakukan pengujian masa terakhir juga; panduan uji lengkap ada di [UAT.md](UAT.md).
 
-Rilis 0.2.0 mendukung tahun 2024–2026, pegawai tetap untuk tujuan PPh21, WP dalam negeri
-sepanjang tahun, identitas valid untuk tarif normal, dan fasilitas Normal. Fasilitas DTP,
+Rilis 0.3.0 mendukung tahun 2024–2026, pegawai tetap untuk tujuan PPh21, WP dalam negeri
+sepanjang tahun dan fasilitas Normal. NIK/NPWP opsional. Fasilitas DTP,
 gross-up sebagian, pegawai tidak tetap, PPh26, serta perubahan kewajiban pajak subjektif
 memerlukan penanganan lain. Kelayakan fasilitas pajak perusahaan harus ditentukan sebelum
 memilih Normal. App ini tidak mengirim laporan atau membuat bukti potong resmi DJP.

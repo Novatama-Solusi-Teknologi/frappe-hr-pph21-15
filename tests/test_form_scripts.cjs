@@ -40,9 +40,9 @@ test('bulk new rows inherit defaults without overwriting existing rows', async (
   const h = harness('bulk_pph21_employee_tax_profile');
   const dt='Bulk PPh21 Employee Tax Profile Row';
   h.locals[dt]={r:{}};
-  h.handlers[dt].employees_add({doc:{default_tax_year:2025,default_method:'Gross'}},dt,'r');
+  h.handlers[dt].employees_add({doc:{default_fiscal_year:'FY-2025',default_method:'Gross'}},dt,'r');
   await tick();
-  assert.equal(h.locals[dt].r.tax_year,2025);
+  assert.equal(h.locals[dt].r.fiscal_year,'FY-2025');
   assert.equal(h.locals[dt].r.method,'Gross');
 });
 test('bulk employee changes clear stale identity and load defaults', async () => {
@@ -88,4 +88,14 @@ test('individual profile loads Employee defaults and resets previous identity', 
   assert.equal(frm.doc.company,'A Co');
   assert.equal(frm.doc.tax_id,'');
   assert.equal(frm.doc.ter_category,'A');
+});
+test('Fiscal Year links use master records on individual and bulk forms', () => {
+  for (const [slug,doctype,expected] of [
+    ['pph21_employee_tax_profile','PPh21 Employee Tax Profile',['fiscal_year']],
+    ['bulk_pph21_employee_tax_profile','Bulk PPh21 Employee Tax Profile',['default_fiscal_year','fiscal_year']],
+  ]) {
+    const h=harness(slug), queries={};
+    h.handlers[doctype].setup({set_query:(name,a,b)=>queries[name]=b||a});
+    for (const name of expected) assert.equal(queries[name]().filters.disabled,0);
+  }
 });

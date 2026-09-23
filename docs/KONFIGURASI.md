@@ -1,4 +1,4 @@
-# Konfigurasi PT PUP - rilis 0.2.0
+# Konfigurasi PT PUP - rilis 0.3.0
 
 Form master memakai 2-3 kolom; tabel mapping tetap selebar form.
 Profil massal dapat dibuat melalui [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md).
@@ -69,14 +69,17 @@ pada PPH21_TAX_ALLOW/PPH21_TAX atau field pph21_tax_* karena menyebabkan keterga
 
 ## 3. Profil pegawai
 
-Buat satu PPh21 Employee Tax Profile per Employee/tahun. Company mengikuti Employee. PTKP default dari `Employee.custom_ptkp` jika ada dan dikenali,
+Buat satu PPh21 Employee Tax Profile per Employee/tahun. Pilih Link **Fiscal Year** dari master ERPNext;
+angka tahun dihitung dari tanggal periode, bukan nama record. Periode harus Januari-Desember, aktif,
+berlaku untuk Company pegawai, dan berada dalam tahun 2024-2026. Company mengikuti Employee. PTKP default dari `Employee.custom_ptkp` jika ada dan dikenali,
 namun tetap dapat dikoreksi. Nilai kosong/tidak dikenali perlu dipilih manual.
 Pilih status PTKP berdasarkan keadaan yang berlaku untuk tahun pajak itu, dengan bukti HR.
 Kategori TER otomatis: A = TK/0,TK/1,K/0; B = TK/2,TK/3,K/1,K/2; C = K/3.
 
-Isi NIK/NPWP dan konfirmasikan valid untuk tarif normal berdasarkan data perpajakan perusahaan.
-App memeriksa format 15/16 digit tetapi tidak menghubungi DJP untuk validasi identitas.
-Rilis ini tidak menghitung tarif tambahan untuk identitas yang tidak memenuhi syarat.
+NIK/NPWP **opsional**. Jika diisi, app memeriksa format 15/16 digit.
+Checkbox verifikasi identitas hanya catatan manual; kosong/tidak terverifikasi tidak memblokir
+penyimpanan profil atau payroll. App tidak menghubungi DJP dan tidak otomatis menandai identitas
+sebagai terverifikasi. Perhitungan tetap memakai skema Normal yang didukung app.
 
 Centang permanent employee dan resident full year hanya jika benar. Pegawai mulai Juli atau
 resign April tetap dapat termasuk WP dalam negeri sepanjang tahun; ini berbeda dari baru

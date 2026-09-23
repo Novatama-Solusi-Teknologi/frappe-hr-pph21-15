@@ -1,6 +1,6 @@
 # Bulk PPh21 Employee Tax Profile
 
-Tersedia mulai **Frappe HR PPh21 0.2.0**, untuk ERPNext/Frappe HR v15.
+Panduan **Frappe HR PPh21 0.3.0**, untuk ERPNext/Frappe HR v15.
 Form dapat dibuka melalui workspace **Frappe HR PPh21** atau pencarian Desk.
 
 ## Tujuan dan tata letak
@@ -9,17 +9,19 @@ Satu form memuat maksimum **200 baris profil**. Bagian default di atas menggunak
 kolom; tabel karyawan menggunakan lebar penuh. Form profil individual dan Settings memakai
 2-3 kolom. Tampilan pada layar kecil mengikuti layout responsif Frappe.
 
-Anda hanya mengisi lima data pajak per baris:
+Empat data utama dan satu identitas opsional tersedia per baris:
 
 | Field | Cara pengisian |
 |---|---|
 | Karyawan | Pilih Employee. Nama dan Company diambil otomatis dari data Employee. |
-| Tahun Pajak | Mengikuti Tahun Pajak Default saat baris ditambahkan; dapat diubah per baris. |
-| NIK / NPWP | Masukkan identitas valid 15/16 digit. Nol di awal dipertahankan karena field berupa teks. |
+| Fiscal Year | Pilih dari DocType Fiscal Year; mengikuti Fiscal Year Default untuk baris baru. Angka tahun internal dihitung otomatis dari tanggal periode. |
+| NIK / NPWP | Opsional. Jika diisi harus 15/16 digit. Kosong pada bulk mempertahankan identitas profil lama. |
 | PTKP | Default dari `Employee.custom_ptkp` jika ada dan dikenali; tetap dapat dikoreksi. |
 | Metode PPh21 | Mengikuti Metode Default saat baris ditambahkan: Gross Up atau Gross. |
 
-Default tahun adalah tahun kalender saat ini; rilis ini menerima 2024-2026. Default metode
+Fiscal Year dipilih dari master yang sudah ada, bukan angka tahun bebas atau tebakan dari
+nama record. Pilih periode aktif 1 Januari-31 Desember yang berlaku untuk Company pegawai;
+tahun didukung 2024-2026. Default metode
 adalah Gross Up. Perubahan default hanya berlaku pada baris baru/kosong, tidak menimpa baris
 lama. Kode Employee dan nama pegawai mengikuti tampilan Link standar ERPNext.
 
@@ -35,7 +37,7 @@ ke seluruh Employee dan akses membuat/mengubah profil yang bersangkutan.
 ## Langkah kerja
 
 1. Buka **Bulk PPh21 Employee Tax Profile > New**.
-2. Tentukan **Tahun Pajak Default** dan **Metode Default**.
+2. Tentukan **Fiscal Year Default** dan **Metode Default**.
 3. Tambahkan baris pada **Profil Karyawan**, pilih Employee, lalu lengkapi lima field di atas.
    Buka detail baris untuk melihat Company/nama karyawan.
 4. Klik **Save**. Ini hanya menyimpan draft batch; profil individual belum diubah.
@@ -46,7 +48,7 @@ ke seluruh Employee dan akses membuat/mengubah profil yang bersangkutan.
 8. Periksa saldo awal jika migrasi serta aktivasi **PPh21 Enabled** pada Employee sebelum payroll.
 
 Persyaratan standar yang dikonfirmasi: pegawai tetap untuk tujuan PPh21, WP dalam negeri
-sepanjang tahun, NIK/NPWP telah divalidasi untuk tarif normal, dan fasilitas Normal.
+sepanjang tahun, dan fasilitas Normal. NIK/NPWP boleh kosong.
 Konfirmasi pengguna bukan validasi identitas online ke DJP. Jika tidak sesuai, jangan
 masukkan pegawai tersebut ke batch standar ini.
 
@@ -56,7 +58,8 @@ masukkan pegawai tersebut ke batch standar ini.
 |---|---|---|
 | Company / Nama Pegawai | Dari Employee | Dari Employee; proteksi payroll tetap berlaku |
 | Kategori TER | Otomatis dari PTKP | Dihitung kembali dari PTKP |
-| Validasi identitas / WP dalam negeri / pegawai tetap | Aktif setelah konfirmasi batch | Dipertahankan; validasi profil tetap berlaku |
+| WP dalam negeri / pegawai tetap | Aktif setelah konfirmasi batch | Dipertahankan |
+| Verifikasi identitas | Tidak ditandai otomatis | Dipertahankan; direset jika identitas diubah |
 | Fasilitas Pajak | Normal | Dipertahankan |
 | Bulan dan nominal saldo awal | 0 | **Dipertahankan**, tidak di-reset |
 | Referensi saldo awal / catatan | Default kosong | **Dipertahankan** |
@@ -89,11 +92,23 @@ Employee yang tercantum. Uji Company User Permission pada site staging.
 
 ## Contoh tiga baris
 
-| Karyawan contoh | Company otomatis | Tahun | NIK/NPWP | custom_ptkp | Metode |
+| Karyawan contoh | Company otomatis | Fiscal Year | NIK/NPWP | custom_ptkp | Metode |
 |---|---|---:|---|---|---|
-| EMP-001 | PT PUP | 2026 | Isi identitas valid | TK/0 | Gross |
-| EMP-002 | PT PUP | 2026 | Isi identitas valid | K/1 | Gross Up |
-| EMP-003 | PT PUP | 2026 | Isi identitas valid | Kosong: pilih manual | Gross Up |
+| EMP-001 | PT PUP | FY 2026 (master) | Boleh kosong | TK/0 | Gross |
+| EMP-002 | PT PUP | FY 2026 (master) | Boleh kosong | K/1 | Gross Up |
+| EMP-003 | PT PUP | FY 2026 (master) | Boleh kosong | Kosong: pilih manual | Gross Up |
 
 Contoh di atas tidak memuat identitas nyata. Saldo awal dan PPh21 Enabled tetap diperiksa
 setelah profil berhasil dibuat.
+
+## Migrasi dari rilis sebelumnya
+
+Migrate menautkan record lama jika tepat satu Fiscal Year aktif sesuai periode dan Company.
+Jika tidak ada atau ambigu, link dibiarkan kosong; angka tahun lama tetap tersimpan untuk
+kompatibilitas histori. Pilih master yang benar sebelum mengedit kembali record tersebut.
+Tidak ada Fiscal Year baru yang dibuat otomatis. Profil baru tetap menggunakan tahun hasil
+master, walaupun angka internal dikirim berbeda melalui API.
+
+Pada profil baru, NIK/NPWP kosong disimpan kosong dan status verifikasi tetap nonaktif.
+Pada profil lama, NIK/NPWP kosong dalam bulk berarti tidak mengubah identitas. Untuk
+menghapus identitas secara sengaja, gunakan profil individual sesuai proteksi histori.

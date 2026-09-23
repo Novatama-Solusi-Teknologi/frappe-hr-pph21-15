@@ -193,8 +193,10 @@ class V15AdapterTest(unittest.TestCase):
     def test_cannot_disable_midyear_with_posted_history(self):
         self.env.employee.pph21_enabled=0;self.env.newer=True
         with self.assertRaisesRegex(ValueError,'menonaktifkan di tengah tahun'): self.calc()
-    def test_unvalidated_tax_identity_rejected(self):
+    def test_optional_identity_does_not_block_payroll(self):
         self.env.profile.tax_identity_validated=0
-        with self.assertRaisesRegex(ValueError,'identitas pajak tervalidasi'): self.calc()
+        self.env.profile.tax_id = ''
+        slip = self.calc()
+        self.assertEqual(slip.pph21_tax_withholding, 230179)
 
 if __name__=='__main__': unittest.main()

@@ -6,6 +6,7 @@ from frappe.utils import cint, getdate
 from frappe_hr_pph21.tax.engine import dec, profile_values
 from frappe_hr_pph21.tax.rules import SUPPORTED_YEARS
 from frappe_hr_pph21.queries import employee_values
+from frappe_hr_pph21.fiscal_year import tax_year_from_fiscal_year
 
 
 class PPh21EmployeeTaxProfile(Document):
@@ -15,8 +16,14 @@ class PPh21EmployeeTaxProfile(Document):
             self.company = values['company']
             self.employee_name = values['employee_name']
             self.ptkp_status = self.ptkp_status or values['ptkp_status']
+        self.tax_year = tax_year_from_fiscal_year(self.fiscal_year, self.company)
+        if not (self.tax_id or '').strip():
+            self.tax_id = ''
+            self.tax_identity_validated = 0
 
     def autoname(self):
+        # Frappe assigns names before before_validate on insert.
+        self.before_validate()
         self.name = f"{self.employee}-{self.tax_year}"
 
     def validate(self):
@@ -27,10 +34,8 @@ class PPh21EmployeeTaxProfile(Document):
         if employee.company != self.company:
             frappe.throw("Company harus sama dengan perusahaan pegawai.")
         self.ter_category = profile_values(self.ptkp_status)[0]
-        if not self.tax_identity_validated:
-            frappe.throw("Validasi NIK/NPWP pegawai untuk tarif normal sebelum mengaktifkan profil. Tarif tanpa identitas valid belum didukung.")
         identity = re.sub(r"[ .-]", "", self.tax_id or "")
-        if not re.fullmatch(r"[0-9]{15,16}", identity):
+        if self.tax_id and not re.fullmatch(r"[0-9]{15,16}", identity):
             frappe.throw("Isi NIK/NPWP 15 atau 16 digit yang valid.")
         if not self.permanent_employee or not self.resident_full_year or self.facility != "Normal":
             frappe.throw("Rilis ini hanya untuk pegawai tetap, WP dalam negeri sepanjang tahun, tanpa fasilitas DTP.")

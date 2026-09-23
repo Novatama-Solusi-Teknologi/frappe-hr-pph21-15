@@ -8,6 +8,7 @@
     "employee_name",
     "identity_column",
     "company",
+    "fiscal_year",
     "tax_year",
     "tax_section",
     "tax_id",
@@ -65,11 +66,20 @@
       "read_only": 1
     },
     {
+      "fieldname": "fiscal_year",
+      "label": "Fiscal Year",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "in_list_view": 1,
+      "options": "Fiscal Year"
+    },
+    {
       "fieldname": "tax_year",
       "label": "Tahun Pajak",
       "fieldtype": "Int",
-      "reqd": 1,
-      "in_list_view": 1
+      "reqd": 0,
+      "read_only": 1,
+      "hidden": 1
     },
     {
       "fieldname": "tax_section",
@@ -80,15 +90,16 @@
       "fieldname": "tax_id",
       "label": "NIK / NPWP",
       "fieldtype": "Data",
-      "description": "Identitas untuk kertas kerja; gunakan identitas perpajakan yang telah tervalidasi.",
-      "reqd": 1
+      "description": "Opsional. Jika diisi, gunakan 15/16 digit; kosong pada bulk tidak menghapus identitas profil lama.",
+      "reqd": 0
     },
     {
       "fieldname": "tax_identity_validated",
-      "label": "NIK/NPWP valid untuk tarif normal",
+      "label": "Identitas telah diverifikasi (catatan)",
       "fieldtype": "Check",
       "default": "0",
-      "description": "Konfirmasi berdasarkan hasil validasi identitas perpajakan. App tidak terhubung ke layanan validasi DJP."
+      "description": "Catatan verifikasi manual, bukan syarat menyimpan profil atau menghitung payroll.",
+      "depends_on": "eval:!!doc.tax_id"
     },
     {
       "fieldname": "tax_column",

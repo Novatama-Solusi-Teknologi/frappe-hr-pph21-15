@@ -1,11 +1,16 @@
-# Validasi rilis 0.2.0
+# Validasi rilis 0.3.0
 
 Tanggal pemeriksaan: 23 September 2026.
 
 ## Hasil lokal
 
-- **57 test Python lulus**: mesin pajak, schema/package, adapter v15, dan controller bulk.
-- **6 test JavaScript lulus**: filter akun, reset pilihan Company, default baris, identitas
+- Tambahan 0.3.0: sumber Fiscal Year dari tanggal master, penolakan periode/Company salah,
+  backfill tanpa menebak, penamaan profil saat insert, identitas opsional, pelestarian NIK
+  lama pada bulk, filter register, dan payroll tanpa identitas terverifikasi.
+
+
+- **67 test Python lulus**: mesin pajak, schema/package, adapter v15, dan controller bulk.
+- **7 test JavaScript lulus**: filter akun, reset pilihan Company, default baris, identitas
   saat Employee berubah, lookup async yang terlambat, dan default profil individual.
 - Controller bulk diuji dengan database double transaksional: create/update/tidak berubah,
   saldo awal dipertahankan, input invalid, izin Employee/profil, konfirmasi wajib,
@@ -42,7 +47,7 @@ GitHub atau Marketplace. Repository tidak berisi kredensial atau data pegawai ny
 Instalasi membuat schema/custom fields dan komponen bernama PPh21, tetapi tidak mengaktifkan
 pegawai, menetapkan akun perusahaan, membuat Salary Slip, atau memposting jurnal.
 
-## Dokumentasi 0.2.0
+## Dokumentasi 0.3.0
 
 Panduan Markdown memuat bulk profile dan upgrade. PDF 11 halaman telah dirender dan
 diperiksa secara visual; contoh angka payroll dipertahankan dari panduan sebelumnya.

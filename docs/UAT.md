@@ -74,3 +74,18 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
   tidak boleh membuka batch berisi NIK pegawai tersebut atau mengisi default pegawai itu.
 - Batch submitted tidak dapat dibatalkan seolah-olah efek profil sudah dihapus.
 - PPh21 Enabled, Salary Slip, serta jurnal tidak dibuat/diaktifkan otomatis oleh bulk.
+
+## Fiscal Year dan identitas opsional - rilis 0.3.0
+
+- Pada profil, bulk (default/baris), dan PPh21 Register, tahun dipilih melalui Link Fiscal Year.
+- Uji master bernama `Periode Payroll PUP` dengan tanggal 2026-01-01 s.d. 2026-12-31:
+  profil harus bernama Employee-2026 dan register mencari tahun 2026, bukan menafsir nama master.
+- Tolak Fiscal Year disabled, lintas tahun/tahun pendek, di luar 2024-2026, atau tidak berlaku
+  untuk Company pegawai. Hak baca Fiscal Year tetap berlaku.
+- Migrate: link profil/bulk lama terisi hanya untuk pasangan master yang tunggal dan cocok.
+  Master tidak ada/ambigu tidak menyebabkan angka tahun, saldo awal, atau snapshot berubah.
+- Profil individual dan bulk dapat disimpan/submitted dengan NIK/NPWP kosong.
+  Payroll TK/0 gross-up 10 juta tetap menghasilkan pajak/tunjangan 230.179.
+- Identitas yang diisi tidak valid (misalnya 12 digit) ditolak; nol di awal tidak hilang.
+- Bulk dengan identitas kosong tidak menghapus NIK/NPWP lama. Identitas baru tidak otomatis
+  dianggap tervalidasi; checkbox verifikasi bukan syarat payroll.

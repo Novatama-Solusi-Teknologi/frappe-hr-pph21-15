@@ -1,8 +1,7 @@
 frappe.ui.form.on("Bulk PPh21 Employee Tax Profile", {
-	onload(frm) {
-		if (frm.is_new() && !frm.doc.default_tax_year) {
-			frm.set_value("default_tax_year", frappe.datetime.get_today().slice(0, 4));
-		}
+	setup(frm) {
+		frm.set_query("default_fiscal_year", () => ({ filters: { disabled: 0 } }));
+		frm.set_query("fiscal_year", "employees", () => ({ filters: { disabled: 0 } }));
 	},
 	refresh(frm) {
 		frm.set_intro(frm.doc.docstatus === 1
@@ -14,7 +13,7 @@ frappe.ui.form.on("Bulk PPh21 Employee Tax Profile", {
 frappe.ui.form.on("Bulk PPh21 Employee Tax Profile Row", {
 	employees_add(frm, cdt, cdn) {
 		frappe.model.set_value(cdt, cdn, {
-			tax_year: frm.doc.default_tax_year,
+			fiscal_year: frm.doc.default_fiscal_year,
 			method: frm.doc.default_method || "Gross Up",
 		});
 	},
