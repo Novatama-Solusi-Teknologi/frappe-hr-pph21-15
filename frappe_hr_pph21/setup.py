@@ -22,7 +22,7 @@ def check_versions():
     for name, version in (("frappe", frappe.__version__), ("erpnext", erpnext.__version__),
                           ("hrms", hrms.__version__)):
         if str(version).split('.')[0] != "15":
-            frappe.throw(f"Frappe HR PPh21 0.1 memerlukan {name} v15; ditemukan {version}.")
+            frappe.throw(f"Frappe HR PPh21 memerlukan {name} v15; ditemukan {version}.")
     overrides = frappe.get_hooks("override_doctype_class").get("Salary Slip", [])
     expected = "frappe_hr_pph21.overrides.salary_slip.PPh21SalarySlip"
     if any(path != expected for path in overrides):
@@ -38,11 +38,22 @@ def after_migrate():
     check_versions()
     sync_custom_fields()
     create_components()
+    sync_mapping_codes()
+
+
+def sync_mapping_codes():
+    """Populate display metadata on existing mappings without saving payroll/settings."""
+    for row in frappe.get_all('PPh21 Component Tax Mapping',
+                              fields=['name', 'salary_component', 'component_abbr']):
+        abbr = frappe.db.get_value('Salary Component', row.salary_component, 'salary_component_abbr')
+        if row.component_abbr != abbr:
+            frappe.db.set_value('PPh21 Component Tax Mapping', row.name,
+                                'component_abbr', abbr, update_modified=False)
 
 
 def sync_custom_fields():
     fields = [dict(fieldname="pph21_tax_section", label="Frappe HR PPh21", fieldtype="Section Break",
-                   insert_after="net_pay", collapsible=1)]
+                   insert_after="base_total_in_words", collapsible=1)]
     specs = [
         ("pph21_tax_profile", "Profil Pajak PPh21", "Link", "PPh21 Employee Tax Profile"),
         ("pph21_tax_year", "Tahun Pajak", "Int", None),
@@ -63,7 +74,23 @@ def sync_custom_fields():
         ("pph21_tax_snapshot", "Kertas Kerja Pajak (JSON)", "Code", "JSON"),
     ]
     previous = "pph21_tax_section"
+    layout = {
+        "pph21_tax_category": ("pph21_identity_column", "Column Break", None),
+        "pph21_tax_rule": ("pph21_rule_column", "Column Break", None),
+        "pph21_tax_base": ("pph21_amounts_section", "Section Break", "Perhitungan PPh21"),
+        "pph21_tax_allowance": ("pph21_allowance_column", "Column Break", None),
+        "pph21_tax_refund": ("pph21_refund_column", "Column Break", None),
+        "pph21_tax_snapshot": ("pph21_snapshot_section", "Section Break", "Kertas Kerja PPh21"),
+    }
     for name, label, kind, options in specs:
+        if name in layout:
+            fieldname, fieldtype, title = layout[name]
+            layout_field = dict(fieldname=fieldname, fieldtype=fieldtype,
+                                insert_after=previous, print_hide=1)
+            if title:
+                layout_field.update(label=title, collapsible=1)
+            fields.append(layout_field)
+            previous = fieldname
         item = dict(fieldname=name, label=label, fieldtype=kind, read_only=1,
                     no_copy=1, insert_after=previous, print_hide=1)
         if options:

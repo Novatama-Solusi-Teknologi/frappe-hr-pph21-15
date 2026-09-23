@@ -5,9 +5,17 @@ from frappe.utils import cint, getdate
 
 from frappe_hr_pph21.tax.engine import dec, profile_values
 from frappe_hr_pph21.tax.rules import SUPPORTED_YEARS
+from frappe_hr_pph21.queries import employee_values
 
 
 class PPh21EmployeeTaxProfile(Document):
+    def before_validate(self):
+        if self.employee:
+            values = employee_values(self.employee)
+            self.company = values['company']
+            self.employee_name = values['employee_name']
+            self.ptkp_status = self.ptkp_status or values['ptkp_status']
+
     def autoname(self):
         self.name = f"{self.employee}-{self.tax_year}"
 

@@ -6,23 +6,32 @@
   "field_order": [
     "employee",
     "employee_name",
+    "identity_column",
     "company",
     "tax_year",
+    "tax_section",
     "tax_id",
     "tax_identity_validated",
+    "tax_column",
     "ptkp_status",
     "ter_category",
     "method",
+    "eligibility_section",
     "resident_full_year",
+    "eligibility_column",
     "permanent_employee",
+    "facility_column",
     "facility",
     "opening_section",
     "opening_through_month",
     "opening_gross",
+    "opening_column",
     "opening_allowance",
     "opening_deductions",
+    "opening_column_2",
     "opening_tax",
     "opening_reference",
+    "notes_section",
     "notes"
   ],
   "fields": [
@@ -42,13 +51,18 @@
       "read_only": 1
     },
     {
+      "fieldname": "identity_column",
+      "fieldtype": "Column Break"
+    },
+    {
       "fieldname": "company",
       "label": "Company",
       "fieldtype": "Link",
       "options": "Company",
       "reqd": 1,
       "fetch_from": "employee.company",
-      "in_list_view": 1
+      "in_list_view": 1,
+      "read_only": 1
     },
     {
       "fieldname": "tax_year",
@@ -56,6 +70,11 @@
       "fieldtype": "Int",
       "reqd": 1,
       "in_list_view": 1
+    },
+    {
+      "fieldname": "tax_section",
+      "fieldtype": "Section Break",
+      "label": "Identitas dan Metode Pajak"
     },
     {
       "fieldname": "tax_id",
@@ -70,6 +89,10 @@
       "fieldtype": "Check",
       "default": "0",
       "description": "Konfirmasi berdasarkan hasil validasi identitas perpajakan. App tidak terhubung ke layanan validasi DJP."
+    },
+    {
+      "fieldname": "tax_column",
+      "fieldtype": "Column Break"
     },
     {
       "fieldname": "ptkp_status",
@@ -93,6 +116,11 @@
       "reqd": 1
     },
     {
+      "fieldname": "eligibility_section",
+      "fieldtype": "Section Break",
+      "label": "Cakupan Perpajakan"
+    },
+    {
       "fieldname": "resident_full_year",
       "label": "WP dalam negeri sepanjang tahun pajak",
       "fieldtype": "Check",
@@ -100,10 +128,18 @@
       "description": "Termasuk pegawai baru/resign yang kewajiban pajak subjektifnya tetap sepanjang tahun. Perubahan kewajiban subjektif belum didukung."
     },
     {
+      "fieldname": "eligibility_column",
+      "fieldtype": "Column Break"
+    },
+    {
       "fieldname": "permanent_employee",
       "label": "Pegawai tetap untuk tujuan PPh 21",
       "fieldtype": "Check",
       "default": "0"
+    },
+    {
+      "fieldname": "facility_column",
+      "fieldtype": "Column Break"
     },
     {
       "fieldname": "facility",
@@ -117,7 +153,8 @@
     {
       "fieldname": "opening_section",
       "label": "Saldo Awal dari Payroll Lama",
-      "fieldtype": "Section Break"
+      "fieldtype": "Section Break",
+      "collapsible": 1
     },
     {
       "fieldname": "opening_through_month",
@@ -133,6 +170,10 @@
       "options": "Company:company:default_currency",
       "default": "0",
       "precision": "2"
+    },
+    {
+      "fieldname": "opening_column",
+      "fieldtype": "Column Break"
     },
     {
       "fieldname": "opening_allowance",
@@ -152,6 +193,10 @@
       "description": "Tidak termasuk biaya jabatan dan PTKP; dihitung kembali oleh app."
     },
     {
+      "fieldname": "opening_column_2",
+      "fieldtype": "Column Break"
+    },
+    {
       "fieldname": "opening_tax",
       "label": "PPh 21 telah dipotong",
       "fieldtype": "Currency",
@@ -163,6 +208,11 @@
       "fieldname": "opening_reference",
       "label": "Referensi kertas kerja saldo awal",
       "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "notes_section",
+      "fieldtype": "Section Break",
+      "label": "Catatan"
     },
     {
       "fieldname": "notes",

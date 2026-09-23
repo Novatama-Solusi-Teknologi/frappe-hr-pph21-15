@@ -1,0 +1,115 @@
+{
+  "doctype": "DocType",
+  "name": "Bulk PPh21 Employee Tax Profile Row",
+  "module": "Frappe HR PPh21",
+  "engine": "InnoDB",
+  "field_order": [
+    "employee",
+    "employee_name",
+    "company",
+    "identity_column",
+    "tax_year",
+    "tax_id",
+    "ptkp_status",
+    "method",
+    "result_section",
+    "tax_profile",
+    "result_column",
+    "result"
+  ],
+  "fields": [
+    {
+      "fieldname": "employee",
+      "fieldtype": "Link",
+      "label": "Karyawan",
+      "options": "Employee",
+      "reqd": 1,
+      "in_list_view": 1,
+      "columns": 3
+    },
+    {
+      "fieldname": "employee_name",
+      "fieldtype": "Data",
+      "label": "Nama Karyawan",
+      "read_only": 1,
+      "fetch_from": "employee.employee_name"
+    },
+    {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "label": "Company",
+      "options": "Company",
+      "read_only": 1,
+      "fetch_from": "employee.company"
+    },
+    {
+      "fieldname": "identity_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "tax_year",
+      "fieldtype": "Int",
+      "label": "Tahun Pajak",
+      "reqd": 1,
+      "in_list_view": 1,
+      "columns": 1
+    },
+    {
+      "fieldname": "tax_id",
+      "fieldtype": "Data",
+      "label": "NIK / NPWP",
+      "reqd": 1,
+      "in_list_view": 1,
+      "columns": 3
+    },
+    {
+      "fieldname": "ptkp_status",
+      "fieldtype": "Select",
+      "label": "PTKP",
+      "options": "\nTK/0\nTK/1\nTK/2\nTK/3\nK/0\nK/1\nK/2\nK/3",
+      "reqd": 1,
+      "in_list_view": 1,
+      "columns": 1
+    },
+    {
+      "fieldname": "method",
+      "fieldtype": "Select",
+      "label": "Metode PPh21",
+      "options": "Gross Up\nGross",
+      "reqd": 1,
+      "in_list_view": 1,
+      "columns": 2
+    },
+    {
+      "fieldname": "result_section",
+      "fieldtype": "Section Break",
+      "label": "Hasil Submit"
+    },
+    {
+      "fieldname": "tax_profile",
+      "fieldtype": "Link",
+      "label": "Profil Pajak",
+      "options": "PPh21 Employee Tax Profile",
+      "read_only": 1,
+      "no_copy": 1
+    },
+    {
+      "fieldname": "result_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "result",
+      "fieldtype": "Data",
+      "label": "Hasil",
+      "read_only": 1,
+      "no_copy": 1
+    }
+  ],
+  "permissions": [],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "istable": 1,
+  "editable_grid": 1
+}

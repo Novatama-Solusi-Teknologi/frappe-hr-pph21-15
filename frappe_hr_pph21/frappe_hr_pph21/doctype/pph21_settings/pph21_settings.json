@@ -6,10 +6,14 @@
   "field_order": [
     "company",
     "enabled",
+    "settings_column",
     "rounding",
     "rule_version",
+    "accounts_section",
     "expense_account",
+    "accounts_column",
     "tax_payable_account",
+    "mapping_section",
     "component_mapping",
     "notes"
   ],
@@ -25,10 +29,14 @@
     },
     {
       "fieldname": "enabled",
-      "label": "Aktifkan PPh 21 PPh21",
+      "label": "Aktifkan PPh21",
       "fieldtype": "Check",
       "default": "0",
       "description": "Hanya pegawai dengan PPh21 Enabled yang diproses."
+    },
+    {
+      "fieldname": "settings_column",
+      "fieldtype": "Column Break"
     },
     {
       "fieldname": "rounding",
@@ -47,6 +55,11 @@
       "default": "PP58-2023_PMK168-2023_v1"
     },
     {
+      "fieldname": "accounts_section",
+      "fieldtype": "Section Break",
+      "label": "Akun Perusahaan"
+    },
+    {
       "fieldname": "expense_account",
       "label": "Beban Tunjangan PPh 21",
       "fieldtype": "Link",
@@ -54,11 +67,20 @@
       "reqd": 1
     },
     {
+      "fieldname": "accounts_column",
+      "fieldtype": "Column Break"
+    },
+    {
       "fieldname": "tax_payable_account",
       "label": "Utang PPh 21 / Pengembalian",
       "fieldtype": "Link",
       "options": "Account",
       "reqd": 1
+    },
+    {
+      "fieldname": "mapping_section",
+      "fieldtype": "Section Break",
+      "label": "Pemetaan Komponen"
     },
     {
       "fieldname": "component_mapping",

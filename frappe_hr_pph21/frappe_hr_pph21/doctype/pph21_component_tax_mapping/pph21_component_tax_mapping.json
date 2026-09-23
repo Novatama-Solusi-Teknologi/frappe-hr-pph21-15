@@ -5,6 +5,8 @@
   "engine": "InnoDB",
   "field_order": [
     "salary_component",
+    "component_abbr",
+    "mapping_column",
     "treatment"
   ],
   "fields": [
@@ -14,7 +16,21 @@
       "fieldtype": "Link",
       "options": "Salary Component",
       "reqd": 1,
-      "in_list_view": 1
+      "in_list_view": 1,
+      "columns": 4
+    },
+    {
+      "fieldname": "component_abbr",
+      "fieldtype": "Data",
+      "label": "Kode Komponen",
+      "fetch_from": "salary_component.salary_component_abbr",
+      "read_only": 1,
+      "in_list_view": 1,
+      "columns": 2
+    },
+    {
+      "fieldname": "mapping_column",
+      "fieldtype": "Column Break"
     },
     {
       "fieldname": "treatment",
@@ -22,7 +38,8 @@
       "fieldtype": "Select",
       "options": "Taxable Cash\nTaxable Noncash\nAnnual Deduction\nNon Taxable\nIgnore",
       "reqd": 1,
-      "in_list_view": 1
+      "in_list_view": 1,
+      "columns": 4
     }
   ],
   "track_changes": 0,

@@ -16,6 +16,10 @@ override_doctype_class = {
 
 doctype_js = {"Salary Slip": "public/js/salary_slip.js"}
 
+has_permission = {
+    "Bulk PPh21 Employee Tax Profile": "frappe_hr_pph21.queries.bulk_profile_permission",
+}
+
 doc_events = {
     "Additional Salary": {"validate": "frappe_hr_pph21.validation.validate_additional_salary"},
     "Salary Structure": {"validate": "frappe_hr_pph21.validation.validate_salary_structure"},

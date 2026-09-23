@@ -22,6 +22,7 @@ class PPh21Settings(Document):
                 frappe.throw("Pemetaan komponen duplikat atau menggunakan komponen otomatis PPh21.")
             seen.add(row.salary_component)
             component = frappe.get_doc("Salary Component", row.salary_component)
+            row.component_abbr = component.salary_component_abbr
             if row.treatment in ("Taxable Cash", "Taxable Noncash", "Non Taxable") and component.type != "Earning":
                 frappe.throw(f"{row.salary_component}: perlakuan ini hanya untuk Earning.")
             if row.treatment == "Annual Deduction" and component.type != "Deduction":

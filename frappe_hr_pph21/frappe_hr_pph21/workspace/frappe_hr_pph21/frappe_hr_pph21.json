@@ -8,7 +8,7 @@
   "public": 1,
   "is_hidden": 0,
   "sequence_id": 40,
-  "content": "[{\"id\": \"pph21_header\", \"type\": \"header\", \"data\": {\"text\": \"<b>Frappe HR PPh21 \\u00b7 PPh 21 Indonesia</b>\", \"col\": 12}}, {\"id\": \"pph21_0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Settings\", \"col\": 4}}, {\"id\": \"pph21_1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Register\", \"col\": 4}}, {\"id\": \"pph21_3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 TER Reference\", \"col\": 4}}, {\"id\": \"pph21_4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Salary Slip\", \"col\": 4}}]",
+  "content": "[{\"id\": \"pph21_header\", \"type\": \"header\", \"data\": {\"text\": \"<b>Frappe HR PPh21 \\u00b7 PPh 21 Indonesia</b>\", \"col\": 12}}, {\"id\": \"pph21_0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Settings\", \"col\": 4}}, {\"id\": \"pph21_1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_bulk\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Bulk PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Register\", \"col\": 4}}, {\"id\": \"pph21_3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 TER Reference\", \"col\": 4}}, {\"id\": \"pph21_4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Salary Slip\", \"col\": 4}}]",
   "shortcuts": [
     {
       "label": "PPh21 Settings",
@@ -23,6 +23,13 @@
       "type": "DocType",
       "doc_view": "List",
       "color": "Blue"
+    },
+    {
+      "label": "Bulk PPh21 Employee Tax Profile",
+      "link_to": "Bulk PPh21 Employee Tax Profile",
+      "type": "DocType",
+      "doc_view": "List",
+      "color": "Green"
     },
     {
       "label": "PPh21 Register",

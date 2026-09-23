@@ -7,7 +7,7 @@ kepada pegawai sungguhan saat UAT. Pengujian berikut belum dijalankan pada site 
 
 1. Pastikan Frappe/ERPNext/HRMS major 15 dan tidak ada override Salary Slip lain.
 2. Install app, migrate, buka workspace Frappe HR PPh21 sebagai HR Manager.
-3. Periksa tiga Salary Component, dua form master, custom fields Employee/Salary Slip,
+3. Periksa tiga Salary Component, tiga form utama (Settings, profil, Bulk), custom fields Employee/Salary Slip,
    register, dan referensi TER. Pastikan tidak ada pegawai/perusahaan otomatis aktif.
 4. Jalankan migrate sekali lagi: komponen tidak duplikat, account tetap tersimpan.
 5. Jika testing di bench sendiri, jalankan smoke test yang tercantum di README.
@@ -50,3 +50,27 @@ Submit melalui **Payroll Entry**, bukan hanya tombol Salary Slip. Periksa:
 
 Catat versi minor Frappe/ERPNext/HRMS, input, hasil payroll pembanding, jurnal, dan sign-off
 penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak yang digunakan.
+
+## Form dan Bulk - rilis 0.2.0
+
+- Periksa layout 2-3 kolom di Settings/profil/detail baris dan bagian pajak Salary Slip,
+  tabel lebar penuh, serta keterbacaan di desktop dan layar sempit.
+- Cari Salary Component dengan nama dan abbreviation; keduanya tampil pada dropdown.
+  Mapping lama setelah migrate menampilkan Kode Komponen yang benar.
+- Pilih Company A: hanya akun A sesuai root type, IDR, aktif, non-group tersedia.
+  Ganti Company B: akun lama kosong; pencarian hanya akun B. Coba kirim akun A melalui
+  API pada settings Company B: validasi harus tetap menolak.
+- Buat batch 3 karyawan. Company otomatis, custom_ptkp valid terisi; custom_ptkp kosong
+  atau tidak dikenali meminta input manual. Ubah default: baris lama tidak tertimpa.
+- Save draft tidak membuat profil. Submit tanpa konfirmasi ditolak. Setelah konfirmasi,
+  Submit membuat profil dan tautan hasil dengan default Normal/saldo awal nol.
+- Ulangi melalui batch baru: nilai identik menghasilkan Tidak berubah; tidak ada duplikasi.
+- Perbarui profil yang belum digunakan: lima input berubah, saldo awal/catatan tetap.
+- Baris terakhir mengubah profil terkunci: submit gagal; seluruh perubahan baris sebelumnya
+  harus di-rollback pada database nyata. Draft dapat diperbaiki dan diajukan ulang.
+- Uji dua batch bersamaan untuk Employee/tahun sama dan batch bersamaan dengan submit slip.
+  Tidak boleh ada profil ganda atau perubahan melewati proteksi payroll.
+- Uji akses Company User Permission: user yang tidak dapat membaca salah satu Employee
+  tidak boleh membuka batch berisi NIK pegawai tersebut atau mengisi default pegawai itu.
+- Batch submitted tidak dapat dibatalkan seolah-olah efek profil sudah dihapus.
+- PPh21 Enabled, Salary Slip, serta jurnal tidak dibuat/diaktifkan otomatis oleh bulk.

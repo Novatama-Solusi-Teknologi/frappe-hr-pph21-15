@@ -1,6 +1,6 @@
 # Frappe HR PPh21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.1.0**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.2.0**, kandidat untuk uji staging.
 
 Nama tampilan: **Frappe HR PPh21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -20,6 +20,12 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Snapshot kertas kerja pada setiap slip; register dapat diekspor melalui fitur report Frappe.
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
+
+## Baru di 0.2.0
+
+Form 2-3 kolom, kode komponen pada mapping, filter akun per Company, dan
+[Bulk PPh21 Employee Tax Profile](docs/BULK_PROFILE.md) dengan default PTKP dari Employee.
+Untuk site yang sudah terpasang, ikuti [panduan upgrade](docs/UPGRADE_0_2.md).
 
 ## Memasang ke Frappe Cloud
 
@@ -65,8 +71,11 @@ Buka workspace **Frappe HR PPh21** sebagai **HR Manager** atau **System Manager*
 
 **Jangan menambahkan komponen otomatis PPh21 ke Salary Structure atau Additional Salary.**
 Detail pemetaan BPJS, contoh setup, jurnal, dan saldo awal ada di [KONFIGURASI.md](docs/KONFIGURASI.md).
+Panduan langkah demi langkah dengan kasus taxable/nonobjek, Gross/Gross Up, BPJS, THR,
+dan masa terakhir ada di [STUDI_KASUS_PAYROLL.md](docs/STUDI_KASUS_PAYROLL.md).
+Versi siap baca/cetak: [Panduan PDF 0.2.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
 
-## Batas rilis 0.1.0
+## Batas rilis 0.2.0
 
 - Pegawai tetap untuk tujuan PPh 21, WP dalam negeri sepanjang tahun, identitas pajak valid untuk tarif normal.
 - Tahun yang dibundel: **2024–2026**. Tahun lain diblokir sampai master diperbarui.
@@ -85,6 +94,7 @@ Detail pemetaan BPJS, contoh setup, jurnal, dan saldo awal ada di [KONFIGURASI.m
 
 ```sh
 python3 -m unittest discover -s tests -v
+node --test tests/test_form_scripts.cjs
 ```
 
 Untuk contract test menggunakan metode kalkulasi asli HRMS v15:

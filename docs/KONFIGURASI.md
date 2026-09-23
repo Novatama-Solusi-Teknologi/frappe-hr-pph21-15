@@ -1,4 +1,7 @@
-# Konfigurasi PT PUP
+# Konfigurasi PT PUP - rilis 0.2.0
+
+Form master memakai 2-3 kolom; tabel mapping tetap selebar form.
+Profil massal dapat dibuat melalui [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md).
 
 ## 1. Komponen dan akun
 
@@ -16,6 +19,8 @@ Salary Structure/Additional Salary.** Pengaturan ini diperiksa kembali pada seti
 
 Di PPh21 Settings pilih akun Expense dan Liability non-group, aktif, IDR, milik perusahaan
 tersebut. Menyimpan Settings memetakan akun pada Salary Component untuk perusahaan ini.
+Dropdown akun otomatis dibatasi Company yang dipilih, root type, IDR, aktif, dan non-group.
+Jika Company diganti, pilihan akun lama dikosongkan.
 Tidak ada Company, Chart of Accounts atau Journal Entry yang dibuat otomatis oleh instalasi.
 
 Pengaturan pembulatan awal Floor IDR (ke bawah rupiah penuh). Pilih Half Up IDR bila itu
@@ -23,6 +28,9 @@ kebijakan payroll yang telah dicocokkan dengan pelaporan. Setelah ada slip submi
 perubahan pembulatan diblokir. Pembulatan PKP ke ribuan rupiah tetap wajib di engine.
 
 ## 2. Pemetaan komponen
+
+Dropdown Salary Component menampilkan nama, kode abbreviation, dan tipe komponen.
+Kode juga tampil pada kolom Kode Komponen; pencarian bisa memakai nama atau kode.
 
 Seluruh komponen yang muncul pada slip pegawai PPh21 wajib dipetakan secara eksplisit.
 Checkbox Is Tax Applicable bawaan tidak menjadi sumber keputusan pajak app; mapping ini
@@ -61,7 +69,8 @@ pada PPH21_TAX_ALLOW/PPH21_TAX atau field pph21_tax_* karena menyebabkan keterga
 
 ## 3. Profil pegawai
 
-Buat satu PPh21 Employee Tax Profile per Employee/tahun. Company mengikuti Employee.
+Buat satu PPh21 Employee Tax Profile per Employee/tahun. Company mengikuti Employee. PTKP default dari `Employee.custom_ptkp` jika ada dan dikenali,
+namun tetap dapat dikoreksi. Nilai kosong/tidak dikenali perlu dipilih manual.
 Pilih status PTKP berdasarkan keadaan yang berlaku untuk tahun pajak itu, dengan bukti HR.
 Kategori TER otomatis: A = TK/0,TK/1,K/0; B = TK/2,TK/3,K/1,K/2; C = K/3.
 

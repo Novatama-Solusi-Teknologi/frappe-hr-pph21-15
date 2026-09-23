@@ -1,0 +1,226 @@
+"""Bulk/controller behavior with a transactional in-memory Frappe double.
+Real database, Desk, and Company User Permissions still require staging UAT.
+"""
+import copy
+from datetime import date
+import importlib.util
+from pathlib import Path
+import sys
+import types
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE = 'PPh21 Employee Tax Profile'
+
+
+class Box(dict):
+    def __getattr__(self, key): return self.get(key)
+    def __setattr__(self, key, value): self[key] = value
+
+
+class Doc(Box):
+    def check_permission(self, kind):
+        if self.get('denied'):
+            raise PermissionError('Employee/profile permission denied')
+    def get_doc_before_save(self): return self.get('_old')
+    def insert(self):
+        self.before_validate()
+        self.autoname()
+        self.validate()
+        ENV.profiles[self.name] = copy.deepcopy(dict(self))
+        return self
+    def save(self):
+        self.check_permission('write')
+        self._old = Box(copy.deepcopy(ENV.profiles[self.name]))
+        self.before_validate()
+        self.validate()
+        ENV.profiles[self.name] = copy.deepcopy({k: v for k, v in self.items() if k != '_old'})
+        return self
+
+
+def load(name, relative):
+    spec = importlib.util.spec_from_file_location(name, ROOT / relative)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class Environment:
+    def __init__(self):
+        self.profiles, self.locked, self.read_locks, self.rollbacks = {}, set(), [], 0
+        self.employees = {
+            'EMP-A': Doc(company='Company A', employee_name='Alice', custom_ptkp='TK/0', date_of_joining='2026-01-01'),
+            'EMP-B': Doc(company='Company B', employee_name='Bob', custom_ptkp='K/1', date_of_joining='2026-01-01'),
+        }
+        self.frappe = types.ModuleType('frappe')
+        self.frappe.whitelist = lambda: lambda fn: fn
+        self.frappe.validate_and_sanitize_search_inputs = lambda fn: fn
+        self.frappe.only_for = lambda roles: None
+        self.frappe.throw = lambda msg: self.fail(msg)
+        self.frappe.get_doc = self.get_doc
+        self.frappe.new_doc = lambda dt: self.profile_cls(doctype=dt, opening_reference='')
+        self.frappe.get_list = lambda *a, **kw: self.record_query(kw)
+        self.frappe.db = Box(exists=self.exists, savepoint=self.savepoint, rollback=self.rollback)
+        utils = types.ModuleType('frappe.utils')
+        utils.cint = lambda v: int(v or 0)
+        utils.getdate = lambda v=None: date.fromisoformat(str(v)[:10]) if v else date(2026,9,23)
+        docmod = types.ModuleType('frappe.model.document'); docmod.Document = Doc
+        setup = types.ModuleType('frappe_hr_pph21.setup'); setup.COMPONENTS = {'PPh21 Tunjangan Pajak': None}
+        self.patcher = patch.dict(sys.modules, {'frappe': self.frappe, 'frappe.utils': utils,
+            'frappe.model.document': docmod, 'frappe_hr_pph21.setup': setup})
+        self.patcher.start()
+        self.queries = load('bulk_queries_test', 'frappe_hr_pph21/queries.py')
+        self.query_patcher = patch.dict(sys.modules, {'frappe_hr_pph21.queries': self.queries})
+        self.query_patcher.start()
+        self.profile_cls = load('bulk_profile_test', 'frappe_hr_pph21/frappe_hr_pph21/doctype/pph21_employee_tax_profile/pph21_employee_tax_profile.py').PPh21EmployeeTaxProfile
+        self.bulk_cls = load('bulk_controller_test', 'frappe_hr_pph21/frappe_hr_pph21/doctype/bulk_pph21_employee_tax_profile/bulk_pph21_employee_tax_profile.py').BulkPPh21EmployeeTaxProfile
+    def close(self): self.query_patcher.stop(); self.patcher.stop()
+    @staticmethod
+    def fail(msg): raise ValueError(msg)
+    def get_doc(self, dt, name, **kw):
+        if kw.get('for_update'): self.read_locks.append((dt,name))
+        if dt == 'Employee': return self.employees[name]
+        if dt == PROFILE: return self.profile_cls(copy.deepcopy(self.profiles[name]))
+        raise AssertionError(dt)
+    def exists(self, dt, filters):
+        if dt == 'Salary Slip': return filters['pph21_tax_profile'] in self.locked
+        for name, profile in self.profiles.items():
+            if profile['employee'] == filters['employee'] and profile['tax_year'] == filters['tax_year']:
+                if 'name' not in filters or name != filters['name'][1]: return name
+        return None
+    def savepoint(self, name): self.snapshot = copy.deepcopy(self.profiles)
+    def rollback(self, **kw): self.profiles = self.snapshot; self.rollbacks += 1
+    def record_query(self, kwargs):
+        self.query = kwargs
+        return [Box(name='Gaji Pokok',salary_component_abbr='GP',type='Earning')]
+    def batch(self, names=('EMP-A','EMP-B')):
+        return self.bulk_cls(default_tax_year=2026, default_method='Gross Up', docstatus=0,
+            confirm_standard_assumptions=1, employees=[Box(idx=i,employee=name,tax_id='1234567890123456') for i,name in enumerate(names,1)])
+    def submit(self, doc):
+        doc.before_validate(); doc.validate(); doc.docstatus=1; doc.before_submit()
+
+
+class BulkProfileTest(unittest.TestCase):
+    def setUp(self):
+        global ENV
+        ENV = self.env = Environment()
+        self.addCleanup(self.env.close)
+
+    def test_defaults_company_and_ptkp_are_employee_derived(self):
+        batch = self.env.batch()
+        batch.employees[0].company = 'Spoofed'
+        batch.before_validate(); batch.validate()
+        self.assertEqual(batch.employees[0].company,'Company A')
+        self.assertEqual(batch.employees[1].company,'Company B')
+        self.assertEqual(batch.employees[1].ptkp_status,'K/1')
+        self.assertEqual(batch.employees[0].method,'Gross Up')
+        self.assertEqual(self.env.profiles,{})  # draft cannot create profiles
+
+    def test_missing_custom_ptkp_needs_manual_selection(self):
+        del self.env.employees['EMP-A']['custom_ptkp']
+        batch = self.env.batch(('EMP-A',)); batch.before_validate()
+        with self.assertRaisesRegex(ValueError,'PTKP'): batch.validate()
+        batch.employees[0].ptkp_status='TK/2'; batch.validate()
+
+    def test_ptkp_normalization_and_no_guess_for_unknown(self):
+        self.env.employees['EMP-A'].custom_ptkp=' k  /  2 '
+        self.assertEqual(self.env.queries.employee_values('EMP-A')['ptkp_status'],'K/2')
+        self.env.employees['EMP-A'].custom_ptkp='K/I/3'
+        self.assertEqual(self.env.queries.employee_values('EMP-A')['ptkp_status'],'')
+
+    def test_duplicate_employee_year_rejected(self):
+        batch = self.env.batch(('EMP-A','EMP-A')); batch.before_validate()
+        with self.assertRaisesRegex(ValueError,'duplikat'): batch.validate()
+
+    def test_same_employee_different_years_allowed(self):
+        batch = self.env.batch(('EMP-A','EMP-A'))
+        self.env.employees['EMP-A'].date_of_joining='2025-01-01'
+        batch.employees[1].tax_year=2025
+        self.env.submit(batch)
+        self.assertEqual(len(self.env.profiles),2)
+
+    def test_invalid_year_id_method_and_batch_limit(self):
+        for key,value,message in [('tax_year',2027,'tahun pajak'),('tax_id','12','NIK'),('method','Net','Gross')]:
+            with self.subTest(key=key):
+                batch=self.env.batch(('EMP-A',)); batch.before_validate(); batch.employees[0][key]=value
+                with self.assertRaisesRegex(ValueError,message): batch.validate()
+        batch=self.env.batch(('EMP-A',)*201)
+        with self.assertRaisesRegex(ValueError,'200'): batch.validate()
+
+    def test_confirmation_required_before_submit(self):
+        for value in (0, '0', None):
+            batch=self.env.batch(); batch.confirm_standard_assumptions=value
+            with self.assertRaisesRegex(ValueError,'Konfirmasikan'): self.env.submit(batch)
+        self.assertEqual(self.env.profiles,{})
+
+    def test_create_profiles_with_standard_defaults_no_employee_activation(self):
+        batch=self.env.batch(); self.env.submit(batch)
+        self.assertEqual(len(self.env.profiles),2)
+        profile=self.env.profiles['EMP-A-2026']
+        for key in ('tax_identity_validated','resident_full_year','permanent_employee'): self.assertEqual(profile[key],1)
+        self.assertEqual(profile['facility'],'Normal')
+        self.assertEqual(profile['opening_gross'],0)
+        self.assertEqual(profile['ter_category'],'A')
+        self.assertIsNone(self.env.employees['EMP-A'].pph21_enabled)
+        self.assertEqual(batch.employees[0].result,'Dibuat')
+
+    def test_existing_profile_preserves_opening_balances(self):
+        self.env.submit(self.env.batch(('EMP-A',)))
+        stored=self.env.profiles['EMP-A-2026']
+        stored.update(opening_through_month=8,opening_gross=80_000_000,opening_tax=1_600_000,opening_reference='REKAP-08')
+        batch=self.env.batch(('EMP-A',)); batch.employees[0].method='Gross'
+        self.env.submit(batch)
+        self.assertEqual(self.env.profiles['EMP-A-2026']['opening_gross'],80_000_000)
+        self.assertEqual(self.env.profiles['EMP-A-2026']['opening_reference'],'REKAP-08')
+        self.assertEqual(batch.employees[0].result,'Diperbarui')
+
+    def test_repeat_batch_unchanged_and_locked_profile_unchanged_allowed(self):
+        self.env.submit(self.env.batch(('EMP-A',)))
+        self.env.locked.add('EMP-A-2026')
+        batch=self.env.batch(('EMP-A',)); self.env.submit(batch)
+        self.assertEqual(len(self.env.profiles),1)
+        self.assertEqual(batch.employees[0].result,'Tidak berubah')
+
+    def test_locked_profile_change_rolls_back_entire_batch(self):
+        self.env.submit(self.env.batch(('EMP-B',)))
+        self.env.locked.add('EMP-B-2026')
+        batch=self.env.batch(); batch.employees[1].method='Gross'
+        with self.assertRaisesRegex(ValueError,'submitted'): self.env.submit(batch)
+        self.assertNotIn('EMP-A-2026',self.env.profiles)
+        self.assertEqual(self.env.profiles['EMP-B-2026']['method'],'Gross Up')
+        self.assertEqual(self.env.rollbacks,1)
+
+    def test_later_invalid_join_date_rolls_back_earlier_insert(self):
+        self.env.employees['EMP-B'].date_of_joining='2027-01-01'
+        with self.assertRaisesRegex(ValueError,'tanggal mulai'): self.env.submit(self.env.batch())
+        self.assertEqual(self.env.profiles,{})
+
+    def test_employee_permission_is_enforced_before_defaults(self):
+        self.env.employees['EMP-B'].denied=True
+        with self.assertRaises(PermissionError): self.env.batch().before_validate()
+        with self.assertRaises(PermissionError): self.env.queries.employee_tax_defaults('EMP-B')
+
+    def test_existing_profile_permission_enforced(self):
+        self.env.submit(self.env.batch(('EMP-B',)))
+        self.env.profiles['EMP-B-2026']['denied']=True
+        with self.assertRaises(PermissionError): self.env.submit(self.env.batch())
+        self.assertNotIn('EMP-A-2026',self.env.profiles)
+
+    def test_component_search_uses_permission_aware_list_and_code(self):
+        found=self.env.queries.salary_component_query('Salary Component','GP','name',0,999)
+        self.assertEqual(found,[['Gaji Pokok','GP','Earning']])
+        self.assertEqual(self.env.query['page_length'],50)
+        self.assertIn('salary_component_abbr',self.env.query['or_filters'])
+        self.assertIn('name',self.env.query['filters'])
+
+    def test_batch_cannot_be_cancelled_as_if_profiles_were_undone(self):
+        with self.assertRaisesRegex(ValueError,'tidak dapat dibatalkan'): self.env.batch().before_cancel()
+
+    def test_batch_read_requires_access_to_every_employee(self):
+        self.env.frappe.has_permission = lambda dt, perm, doc, user: doc != 'EMP-B'
+        self.assertFalse(self.env.queries.bulk_profile_permission(self.env.batch(), user='limited'))
+        self.assertTrue(self.env.queries.bulk_profile_permission(self.env.batch(('EMP-A',)), user='limited'))
+
+
+if __name__ == '__main__': unittest.main()

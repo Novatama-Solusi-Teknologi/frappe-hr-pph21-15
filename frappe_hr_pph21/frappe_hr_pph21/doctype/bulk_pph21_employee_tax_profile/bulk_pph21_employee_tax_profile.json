@@ -1,0 +1,110 @@
+{
+  "doctype": "DocType",
+  "name": "Bulk PPh21 Employee Tax Profile",
+  "module": "Frappe HR PPh21",
+  "engine": "InnoDB",
+  "field_order": [
+    "default_tax_year",
+    "defaults_column",
+    "default_method",
+    "summary_column",
+    "employee_count",
+    "employees_section",
+    "employees",
+    "confirmation_section",
+    "confirm_standard_assumptions"
+  ],
+  "fields": [
+    {
+      "fieldname": "default_tax_year",
+      "fieldtype": "Int",
+      "label": "Tahun Pajak Default",
+      "reqd": 1
+    },
+    {
+      "fieldname": "defaults_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "default_method",
+      "fieldtype": "Select",
+      "label": "Metode Default",
+      "options": "Gross Up\nGross",
+      "default": "Gross Up",
+      "reqd": 1
+    },
+    {
+      "fieldname": "summary_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "employee_count",
+      "fieldtype": "Int",
+      "label": "Jumlah Profil",
+      "read_only": 1
+    },
+    {
+      "fieldname": "employees_section",
+      "fieldtype": "Section Break",
+      "label": "Daftar Karyawan"
+    },
+    {
+      "fieldname": "employees",
+      "fieldtype": "Table",
+      "label": "Profil Karyawan",
+      "options": "Bulk PPh21 Employee Tax Profile Row",
+      "reqd": 1,
+      "description": "Maksimum 200 baris. Company mengikuti Employee. Save hanya menyimpan draft; Submit membuat/memperbarui profil."
+    },
+    {
+      "fieldname": "confirmation_section",
+      "fieldtype": "Section Break",
+      "label": "Konfirmasi Sebelum Submit"
+    },
+    {
+      "fieldname": "confirm_standard_assumptions",
+      "fieldtype": "Check",
+      "label": "Saya mengonfirmasi seluruh baris memenuhi persyaratan standar",
+      "default": "0",
+      "no_copy": 1,
+      "description": "Pegawai tetap untuk PPh21, WP dalam negeri sepanjang tahun, NIK/NPWP telah divalidasi untuk tarif normal, fasilitas Normal. Saldo awal profil baru nol; lengkapi profil individual jika migrasi. Profil lama mempertahankan saldo awal dan field lainnya."
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "email": 0,
+      "submit": 1,
+      "cancel": 0,
+      "amend": 0
+    },
+    {
+      "role": "HR Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "email": 0,
+      "submit": 1,
+      "cancel": 0,
+      "amend": 0
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "is_submittable": 1,
+  "autoname": "format:PPH21-BULK-{YYYY}-{#####}",
+  "track_changes": 1
+}

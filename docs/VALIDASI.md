@@ -1,10 +1,15 @@
-# Validasi rilis 0.1.0
+# Validasi rilis 0.2.0
 
 Tanggal pemeriksaan: 23 September 2026.
 
 ## Hasil lokal
 
-- **40 test case lulus**: mesin pajak, schema/package, dan adapter v15.
+- **57 test Python lulus**: mesin pajak, schema/package, adapter v15, dan controller bulk.
+- **6 test JavaScript lulus**: filter akun, reset pilihan Company, default baris, identitas
+  saat Employee berubah, lookup async yang terlambat, dan default profil individual.
+- Controller bulk diuji dengan database double transaksional: create/update/tidak berubah,
+  saldo awal dipertahankan, input invalid, izin Employee/profil, konfirmasi wajib,
+  serta rollback seluruh batch ketika baris berikutnya gagal atau profil terkunci.
 - Uji gross-up mencakup **2.928 kombinasi** sekitar batas TER dan 400 sampel acak deterministik.
 - Contoh PP 58/2023: pegawai K/0, gaji 10 juta/bulan dan pensiun 100 ribu/bulan menghasilkan
   pajak setahun 2.715.000 dan pemotongan Desember 515.000.
@@ -23,8 +28,8 @@ Tanggal pemeriksaan: 23 September 2026.
 
 Belum dijalankan instalasi/migrate, UI Desk, permission enforcement, transaksi database
 bersamaan, dan posting Journal Entry pada bench Frappe/ERPNext/HRMS lengkap ataupun site
-Frappe Cloud PT PUP. Persiapan runtime lokal terhenti karena keterbatasan ruang disk.
-Contract tests tidak dianggap sebagai pengganti pengujian tersebut.
+Frappe Cloud PT PUP. Unit/contract tests menggunakan database dan layanan tiruan, bukan bench lengkap.
+Test rollback lokal tidak dianggap sebagai pengganti pengujian transaksi database nyata.
 
 Smoke test `frappe_hr_pph21.tests.test_installation` disertakan untuk dijalankan pada site testing
 yang sudah memasang app. [UAT.md](UAT.md) memuat skenario transaksi dan jurnal yang perlu
@@ -36,3 +41,9 @@ Tidak ada koneksi atau perubahan ke ERPNext/Frappe Cloud produksi. App belum diu
 GitHub atau Marketplace. Repository tidak berisi kredensial atau data pegawai nyata.
 Instalasi membuat schema/custom fields dan komponen bernama PPh21, tetapi tidak mengaktifkan
 pegawai, menetapkan akun perusahaan, membuat Salary Slip, atau memposting jurnal.
+
+## Dokumentasi 0.2.0
+
+Panduan Markdown memuat bulk profile dan upgrade. PDF 11 halaman telah dirender dan
+diperiksa secara visual; contoh angka payroll dipertahankan dari panduan sebelumnya.
+Tidak ada perubahan pada `tax/engine.py` atau master tarif dalam revisi ini.

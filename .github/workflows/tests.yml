@@ -13,6 +13,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/test_form_scripts.cjs
       - run: python -m pip install flit_core build pyflakes
       - name: Download pinned HRMS v15 source for contract test
         run: curl -L --fail https://raw.githubusercontent.com/frappe/hrms/2238ff627439b0ca0b02badbebed7ffd00273637/hrms/payroll/doctype/salary_slip/salary_slip.py -o /tmp/pph21-v15-salary-slip.py

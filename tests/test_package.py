@@ -11,7 +11,7 @@ PACKAGE = ROOT / "frappe_hr_pph21"
 class PackageTest(unittest.TestCase):
     def test_doctype_schemas_and_controllers(self):
         paths = list((PACKAGE / "frappe_hr_pph21/doctype").glob("*/*.json"))
-        self.assertEqual(len(paths), 3)
+        self.assertEqual(len(paths), 5)
         for path in paths:
             schema = json.loads(path.read_text())
             names = [row['fieldname'] for row in schema['fields']]
@@ -31,6 +31,7 @@ class PackageTest(unittest.TestCase):
         paths = [hooks.before_install, hooks.after_install, hooks.after_migrate]
         paths += list(hooks.override_doctype_class.values())
         paths += [p for events in hooks.doc_events.values() for p in events.values()]
+        paths += list(hooks.has_permission.values())
         for dotted in paths:
             module, symbol = dotted.rsplit('.', 1)
             path = ROOT / (module.replace('.', '/') + '.py')
@@ -40,7 +41,7 @@ class PackageTest(unittest.TestCase):
     def test_workspace_links_and_reports(self):
         workspace = json.loads((PACKAGE / 'frappe_hr_pph21/workspace/frappe_hr_pph21/frappe_hr_pph21.json').read_text())
         blocks = json.loads(workspace['content'])
-        self.assertEqual(len(blocks), 6)
+        self.assertEqual(len(blocks), 7)
         for path in (PACKAGE / 'frappe_hr_pph21/report').glob('*/*.json'):
             report = json.loads(path.read_text())
             self.assertEqual(report['report_type'], 'Script Report')

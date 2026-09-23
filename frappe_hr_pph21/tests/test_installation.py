@@ -9,12 +9,16 @@ from frappe_hr_pph21.setup import COMPONENTS, create_components, validate_compon
 
 class TestPPh21Installation(FrappeTestCase):
     def test_schema_and_controller(self):
-        for name in ('PPh21 Settings', 'PPh21 Employee Tax Profile', 'PPh21 Component Tax Mapping'):
+        for name in ('PPh21 Settings', 'PPh21 Employee Tax Profile', 'PPh21 Component Tax Mapping',
+                     'Bulk PPh21 Employee Tax Profile', 'Bulk PPh21 Employee Tax Profile Row'):
             self.assertTrue(frappe.db.exists('DocType', name))
         self.assertTrue(frappe.get_meta('Employee').has_field('pph21_enabled'))
         meta = frappe.get_meta('Salary Slip')
         self.assertTrue(meta.has_field('pph21_tax_snapshot'))
         self.assertTrue(meta.get_field('pph21_tax_key').unique)
+        self.assertTrue(meta.has_field('pph21_allowance_column'))
+        self.assertTrue(frappe.get_meta('Bulk PPh21 Employee Tax Profile').is_submittable)
+        self.assertTrue(frappe.get_meta('PPh21 Component Tax Mapping').has_field('component_abbr'))
         self.assertTrue(issubclass(get_controller('Salary Slip'), PPh21SalarySlip))
 
     def test_components_and_idempotent_seed(self):
