@@ -1,0 +1,203 @@
+{
+  "doctype": "DocType",
+  "name": "PPh21 Employee Tax Profile",
+  "module": "Frappe HR PPh21",
+  "engine": "InnoDB",
+  "field_order": [
+    "employee",
+    "employee_name",
+    "company",
+    "tax_year",
+    "tax_id",
+    "tax_identity_validated",
+    "ptkp_status",
+    "ter_category",
+    "method",
+    "resident_full_year",
+    "permanent_employee",
+    "facility",
+    "opening_section",
+    "opening_through_month",
+    "opening_gross",
+    "opening_allowance",
+    "opening_deductions",
+    "opening_tax",
+    "opening_reference",
+    "notes"
+  ],
+  "fields": [
+    {
+      "fieldname": "employee",
+      "label": "Employee",
+      "fieldtype": "Link",
+      "options": "Employee",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "employee_name",
+      "label": "Nama Pegawai",
+      "fieldtype": "Data",
+      "fetch_from": "employee.employee_name",
+      "read_only": 1
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1,
+      "fetch_from": "employee.company",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "tax_year",
+      "label": "Tahun Pajak",
+      "fieldtype": "Int",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "tax_id",
+      "label": "NIK / NPWP",
+      "fieldtype": "Data",
+      "description": "Identitas untuk kertas kerja; gunakan identitas perpajakan yang telah tervalidasi.",
+      "reqd": 1
+    },
+    {
+      "fieldname": "tax_identity_validated",
+      "label": "NIK/NPWP valid untuk tarif normal",
+      "fieldtype": "Check",
+      "default": "0",
+      "description": "Konfirmasi berdasarkan hasil validasi identitas perpajakan. App tidak terhubung ke layanan validasi DJP."
+    },
+    {
+      "fieldname": "ptkp_status",
+      "label": "Status PTKP",
+      "fieldtype": "Select",
+      "options": "TK/0\nTK/1\nTK/2\nTK/3\nK/0\nK/1\nK/2\nK/3",
+      "reqd": 1
+    },
+    {
+      "fieldname": "ter_category",
+      "label": "Kategori TER",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "method",
+      "label": "Metode PPh 21",
+      "fieldtype": "Select",
+      "options": "Gross Up\nGross",
+      "default": "Gross Up",
+      "reqd": 1
+    },
+    {
+      "fieldname": "resident_full_year",
+      "label": "WP dalam negeri sepanjang tahun pajak",
+      "fieldtype": "Check",
+      "default": "0",
+      "description": "Termasuk pegawai baru/resign yang kewajiban pajak subjektifnya tetap sepanjang tahun. Perubahan kewajiban subjektif belum didukung."
+    },
+    {
+      "fieldname": "permanent_employee",
+      "label": "Pegawai tetap untuk tujuan PPh 21",
+      "fieldtype": "Check",
+      "default": "0"
+    },
+    {
+      "fieldname": "facility",
+      "label": "Fasilitas Pajak",
+      "fieldtype": "Select",
+      "options": "Normal\nDTP",
+      "default": "Normal",
+      "reqd": 1,
+      "description": "Rilis ini mendukung Normal; DTP akan diblokir, bukan dihitung sebagai pajak normal."
+    },
+    {
+      "fieldname": "opening_section",
+      "label": "Saldo Awal dari Payroll Lama",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "opening_through_month",
+      "label": "Saldo awal sampai bulan",
+      "fieldtype": "Int",
+      "default": "0",
+      "description": "0 bila tidak ada migrasi. Isi 8 jika mulai memakai app pada September. Hanya penghasilan dari pemberi kerja yang sama."
+    },
+    {
+      "fieldname": "opening_gross",
+      "label": "Bruto objek pajak termasuk tunjangan pajak",
+      "fieldtype": "Currency",
+      "options": "Company:company:default_currency",
+      "default": "0",
+      "precision": "2"
+    },
+    {
+      "fieldname": "opening_allowance",
+      "label": "Tunjangan pajak (sudah termasuk bruto)",
+      "fieldtype": "Currency",
+      "options": "Company:company:default_currency",
+      "default": "0",
+      "precision": "2"
+    },
+    {
+      "fieldname": "opening_deductions",
+      "label": "Iuran pensiun/JHT/JP dan zakat yang diperbolehkan",
+      "fieldtype": "Currency",
+      "options": "Company:company:default_currency",
+      "default": "0",
+      "precision": "2",
+      "description": "Tidak termasuk biaya jabatan dan PTKP; dihitung kembali oleh app."
+    },
+    {
+      "fieldname": "opening_tax",
+      "label": "PPh 21 telah dipotong",
+      "fieldtype": "Currency",
+      "options": "Company:company:default_currency",
+      "default": "0",
+      "precision": "0"
+    },
+    {
+      "fieldname": "opening_reference",
+      "label": "Referensi kertas kerja saldo awal",
+      "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "notes",
+      "label": "Catatan",
+      "fieldtype": "Small Text"
+    }
+  ],
+  "track_changes": 1,
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "email": 0
+    },
+    {
+      "role": "HR Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "email": 0
+    }
+  ],
+  "allow_rename": 0
+}

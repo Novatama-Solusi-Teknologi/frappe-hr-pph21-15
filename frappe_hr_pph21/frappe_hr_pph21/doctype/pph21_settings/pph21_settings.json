@@ -1,0 +1,107 @@
+{
+  "doctype": "DocType",
+  "name": "PPh21 Settings",
+  "module": "Frappe HR PPh21",
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "enabled",
+    "rounding",
+    "rule_version",
+    "expense_account",
+    "tax_payable_account",
+    "component_mapping",
+    "notes"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "enabled",
+      "label": "Aktifkan PPh 21 PPh21",
+      "fieldtype": "Check",
+      "default": "0",
+      "description": "Hanya pegawai dengan PPh21 Enabled yang diproses."
+    },
+    {
+      "fieldname": "rounding",
+      "label": "Pembulatan PPh",
+      "fieldtype": "Select",
+      "options": "Floor IDR\nHalf Up IDR",
+      "default": "Floor IDR",
+      "reqd": 1,
+      "description": "Konfirmasikan dengan hasil pelaporan pajak. PKP tahunan selalu dibulatkan ke bawah ke ribuan rupiah."
+    },
+    {
+      "fieldname": "rule_version",
+      "label": "Versi Master Pajak",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "default": "PP58-2023_PMK168-2023_v1"
+    },
+    {
+      "fieldname": "expense_account",
+      "label": "Beban Tunjangan PPh 21",
+      "fieldtype": "Link",
+      "options": "Account",
+      "reqd": 1
+    },
+    {
+      "fieldname": "tax_payable_account",
+      "label": "Utang PPh 21 / Pengembalian",
+      "fieldtype": "Link",
+      "options": "Account",
+      "reqd": 1
+    },
+    {
+      "fieldname": "component_mapping",
+      "label": "Pemetaan Komponen",
+      "fieldtype": "Table",
+      "options": "PPh21 Component Tax Mapping",
+      "reqd": 1
+    },
+    {
+      "fieldname": "notes",
+      "label": "Catatan",
+      "fieldtype": "Small Text"
+    }
+  ],
+  "track_changes": 1,
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "email": 0
+    },
+    {
+      "role": "HR Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "email": 0
+    }
+  ],
+  "autoname": "field:company",
+  "allow_rename": 0
+}

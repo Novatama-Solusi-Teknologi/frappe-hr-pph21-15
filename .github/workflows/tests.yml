@@ -1,0 +1,23 @@
+name: Tax and v15 controller contracts
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install flit_core build pyflakes
+      - name: Download pinned HRMS v15 source for contract test
+        run: curl -L --fail https://raw.githubusercontent.com/frappe/hrms/2238ff627439b0ca0b02badbebed7ffd00273637/hrms/payroll/doctype/salary_slip/salary_slip.py -o /tmp/pph21-v15-salary-slip.py
+      - run: python -m pyflakes frappe_hr_pph21 tests
+      - run: python -m unittest discover -s tests -v
+        env:
+          HRMS_SALARY_SLIP_SOURCE: /tmp/pph21-v15-salary-slip.py
+      - run: python -m build

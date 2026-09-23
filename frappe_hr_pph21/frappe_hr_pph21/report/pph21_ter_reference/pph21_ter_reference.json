@@ -1,0 +1,19 @@
+{
+  "doctype": "Report",
+  "name": "PPh21 TER Reference",
+  "report_name": "PPh21 TER Reference",
+  "module": "Frappe HR PPh21",
+  "is_standard": "Yes",
+  "report_type": "Script Report",
+  "ref_doctype": "PPh21 Settings",
+  "disabled": 0,
+  "add_total_row": 0,
+  "roles": [
+    {
+      "role": "HR Manager"
+    },
+    {
+      "role": "System Manager"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "doctype": "DocType",
+  "name": "PPh21 Component Tax Mapping",
+  "module": "Frappe HR PPh21",
+  "engine": "InnoDB",
+  "field_order": [
+    "salary_component",
+    "treatment"
+  ],
+  "fields": [
+    {
+      "fieldname": "salary_component",
+      "label": "Salary Component",
+      "fieldtype": "Link",
+      "options": "Salary Component",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "treatment",
+      "label": "Perlakuan PPh 21",
+      "fieldtype": "Select",
+      "options": "Taxable Cash\nTaxable Noncash\nAnnual Deduction\nNon Taxable\nIgnore",
+      "reqd": 1,
+      "in_list_view": 1
+    }
+  ],
+  "track_changes": 0,
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "permissions": [],
+  "istable": 1,
+  "editable_grid": 1
+}

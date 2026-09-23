@@ -1,0 +1,31 @@
+[project]
+name = "frappe_hr_pph21"
+authors = [{name = "PT PUP"}]
+description = "Indonesian PPh 21 TER and gross-up payroll for ERPNext and Frappe HR v15"
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+dynamic = ["version"]
+
+[build-system]
+requires = ["flit_core>=3.9,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.bench.frappe-dependencies]
+frappe = ">=15.0.0,<16.0.0"
+erpnext = ">=15.0.0,<16.0.0"
+hrms = ">=15.0.0,<16.0.0"
+
+[tool.flit.sdist]
+include = ["docs/", "tests/", "scripts/", "license.txt"]
+
+[tool.flit.module]
+name = "frappe_hr_pph21"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+ignore = ["E501"]
