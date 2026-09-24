@@ -70,3 +70,16 @@ penolakan konflik workspace milik modul lain, serta penyembunyian duplikat tanpa
 kontennya. Empat tes package lulus; pyflakes dan git diff --check lulus. Perubahan menu belum
 diuji langsung pada Desk Frappe Cloud PT PUP. Tes payroll 0.4.0 di atas tidak diulang karena
 perubahan ini hanya label, metadata workspace, serta migrasi navigasi.
+
+## Hotfix 0.4.2
+
+Error dari log site berhasil direproduksi setelah double `frappe.rename_doc` memakai
+signature public API Frappe v15 yang ketat, bukan `**kwargs`. Tes gagal dengan
+`unexpected keyword argument 'ignore_permissions'` sebelum perbaikan, lalu lulus
+setelah parameter tersebut dihapus. Tiga tes migrasi dan empat tes package lulus;
+pyflakes dan git diff --check juga lulus. Payroll tidak diubah atau diuji ulang pada hotfix ini.
+
+Signature diverifikasi pada source resmi:
+https://github.com/frappe/frappe/blob/version-15/frappe/__init__.py
+(`frappe.rename_doc`, berbeda dari fungsi internal di `frappe.model.rename_doc`).
+Belum dijalankan ulang migrasi pada Frappe Cloud PT PUP dari lingkungan ini.

@@ -1,5 +1,25 @@
 # Upgrade ke 0.4.0 - beberapa Settings dalam satu Company
 
+## Hotfix 0.4.2 untuk migrasi yang gagal pada 0.4.1
+
+Jika log berhenti di `workspace.py` dengan
+`TypeError: rename_doc() got an unexpected keyword argument 'ignore_permissions'`,
+gunakan source **0.4.2**. Masalahnya ada pada pemanggilan public API Frappe di app,
+bukan pada isian PPh21 Settings. Hotfix menghapus parameter yang tidak diterima wrapper tersebut.
+
+1. Ganti source app di repository dengan source 0.4.2, lalu commit dan push ke branch yang dipakai Frappe Cloud.
+2. Deploy pembaruan app/bench yang mengambil commit baru itu ke site. Pastikan source baru sudah terpasang;
+   retry migrasi dengan source 0.4.1 masih akan menghasilkan error yang sama.
+3. Jalankan ulang migrate melalui proses update site. Jika memakai bench CLI:
+   `bench --site primaunggul-live.frappe.cloud migrate`.
+4. Setelah berhasil, reload Desk dan periksa menu **HR > PPh 21**.
+
+Tidak perlu uninstall app, menghapus workspace, atau menghapus data payroll untuk error ini.
+Pemanggilan yang gagal ditolak sebelum fungsi rename dijalankan. Migrasi workspace tetap
+idempotent: jika workspace sudah bernama PPh 21, fungsi tidak menamainya ulang.
+Jika ada error berikutnya, gunakan bagian akhir traceback baru untuk diagnosis; tes lokal
+tidak membuktikan seluruh migrasi site live telah berhasil.
+
 Deploy source melalui repository app di Frappe Cloud, jalankan migrate, lalu reload browser.
 Tidak perlu uninstall/reinstall. Perubahan schema menghapus batas unik Company pada Settings.
 

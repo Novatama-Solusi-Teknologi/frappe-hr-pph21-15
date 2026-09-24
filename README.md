@@ -1,6 +1,6 @@
 # PPh 21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.4.1**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.4.2**, kandidat untuk uji staging.
 
 Nama tampilan: **PPh 21**. Menu default: **HR > PPh 21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -20,6 +20,12 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Snapshot kertas kerja pada setiap slip; register dapat diekspor melalui fitur report Frappe.
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
+
+## Perbaikan 0.4.2
+
+Memperbaiki error migrasi `rename_doc() got an unexpected keyword argument 'ignore_permissions'`
+saat upgrade workspace. Deploy commit baru sebelum menjalankan ulang migrate; retry dengan
+source 0.4.1 akan mengulang error. Petunjuk pemulihan ada di [panduan upgrade](docs/UPGRADE_0_4.md).
 
 ## Baru di 0.4.1
 

@@ -17,7 +17,11 @@ class WorkspaceMigrationTest(unittest.TestCase):
         frappe=types.ModuleType('frappe')
         def set_value(dt,name,field,value=None):
             self.records[name].update(field if isinstance(field,dict) else {field:value})
-        def rename(dt,old,new,**kwargs):
+        # Match the public frappe.rename_doc v15 signature. Accepting **kwargs here
+        # hid the unsupported ignore_permissions keyword in the previous tests.
+        def rename(dt,old,new,force=False,merge=False,*,ignore_if_exists=False,
+                   show_alert=True,rebuild_search=True):
+            self.assertTrue(force)
             self.records[new]=self.records.pop(old);self.renames.append((old,new))
         frappe.db=Box(get_value=lambda dt,name,*a,**kw:self.records.get(name),
                       set_value=set_value,exists=lambda dt,name:name in self.records)

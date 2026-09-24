@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 — 2026-09-24
+
+- Memperbaiki kegagalan before_migrate: public API `frappe.rename_doc` v15 tidak menerima keyword `ignore_permissions`.
+- Pemanggilan rename memakai signature public API; tes migrasi diperketat agar parameter yang tidak didukung tidak lolos lagi.
+- Menu tetap HR > PPh 21. Tidak ada perubahan perhitungan pajak, akun, atau data payroll.
+
 ## 0.4.1 — 2026-09-24
 
 - Label app/workspace menjadi PPh 21; menu default sebagai child HR.

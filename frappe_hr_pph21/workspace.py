@@ -15,7 +15,9 @@ def before_migrate():
     if not old or old.module != MODULE or not old.public:
         return
     if not existing:
-        frappe.rename_doc('Workspace', OLD_NAME, NAME, force=True, ignore_permissions=True)
+        # Migration runs as Administrator. The public v15 wrapper does not accept
+        # ignore_permissions (that keyword belongs to the internal model function).
+        frappe.rename_doc('Workspace', OLD_NAME, NAME, force=True)
         frappe.db.set_value('Workspace', NAME, {'label': NAME, 'title': NAME, 'parent_page': 'HR'})
     else:
         # Preserve any old custom content if both records already exist, but hide the duplicate menu.
