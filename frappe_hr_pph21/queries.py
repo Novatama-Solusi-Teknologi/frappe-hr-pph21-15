@@ -26,7 +26,8 @@ def employee_values(employee):
 
 @frappe.whitelist()
 def employee_tax_defaults(employee):
-    frappe.only_for(['HR Manager', 'System Manager'])
+    # Respect configured Employee document permissions, including custom payroll
+    # roles and User Permissions. employee_values checks read before returning data.
     return employee_values(employee)
 
 

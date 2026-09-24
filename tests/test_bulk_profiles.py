@@ -217,6 +217,21 @@ class BulkProfileTest(unittest.TestCase):
         with self.assertRaises(PermissionError): self.env.batch().before_validate()
         with self.assertRaises(PermissionError): self.env.queries.employee_tax_defaults('EMP-B')
 
+    def test_custom_role_with_employee_read_can_load_defaults(self):
+        roles = {'PUP Payroll Operator'}
+        def only_for(allowed_roles):
+            if not roles.intersection(allowed_roles):
+                raise PermissionError('User does not have the hard-coded roles')
+        self.env.frappe.only_for = only_for
+        self.env.employees['EMP-A'].tax_id = 'private-not-returned'
+        self.assertEqual(self.env.queries.employee_tax_defaults('EMP-A'), {
+            'company': 'Company A', 'employee_name': 'Alice', 'ptkp_status': 'TK/0',
+        })
+        # A custom role still cannot read an Employee outside its permitted scope.
+        self.env.employees['EMP-B'].denied = True
+        with self.assertRaisesRegex(PermissionError, 'Employee/profile permission denied'):
+            self.env.queries.employee_tax_defaults('EMP-B')
+
     def test_existing_profile_permission_enforced(self):
         self.env.submit(self.env.batch(('EMP-B',)))
         self.env.profiles['EMP-B-2026']['denied']=True

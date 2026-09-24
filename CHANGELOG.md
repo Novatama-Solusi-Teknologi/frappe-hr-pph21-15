@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3 — 2026-09-24
+
+- Lookup Employee pada profil individual/bulk mengikuti izin baca dokumen Employee, bukan whitelist nama role HR Manager/System Manager.
+- Role payroll khusus yang telah diberi izin dapat memuat Company/nama/PTKP. Pembatasan Employee/User Permissions serta izin create/write/submit profil tetap berlaku.
+- Tes mereproduksi penolakan role khusus, memastikan lookup berhasil setelah perbaikan, dan tetap menolak Employee yang tidak boleh dibaca.
+
 ## 0.4.2 — 2026-09-24
 
 - Memperbaiki kegagalan before_migrate: public API `frappe.rename_doc` v15 tidak menerima keyword `ignore_permissions`.

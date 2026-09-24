@@ -83,3 +83,15 @@ Signature diverifikasi pada source resmi:
 https://github.com/frappe/frappe/blob/version-15/frappe/__init__.py
 (`frappe.rename_doc`, berbeda dari fungsi internal di `frappe.model.rename_doc`).
 Belum dijalankan ulang migrasi pada Frappe Cloud PT PUP dari lingkungan ini.
+
+## Hotfix 0.4.3 - lookup Employee untuk role khusus
+
+Tes role khusus mereproduksi penolakan `frappe.only_for` sebelum perubahan. Setelah
+pembatasan nama role dihapus, lookup mengembalikan Company/nama/PTKP untuk Employee
+yang dapat dibaca dan tetap menolak Employee yang aksesnya ditolak. Fungsi tidak
+menggunakan ignore_permissions dan tidak mengembalikan NIK/NPWP atau field Employee lain.
+
+31 tes controller bulk/profil, 4 tes package, dan 8 tes JavaScript lulus. Pyflakes dan
+git diff --check lulus. Tidak ada perubahan perhitungan pajak. Izin diuji memakai
+Frappe double; pengaturan Role Permission/User Permission serta impersonation pada
+site PT PUP belum diverifikasi langsung dari lingkungan ini.

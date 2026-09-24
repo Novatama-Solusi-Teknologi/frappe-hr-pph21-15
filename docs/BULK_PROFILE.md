@@ -1,6 +1,6 @@
 # Bulk PPh21 Employee Tax Profile
 
-Panduan **Frappe HR PPh21 0.4.0**, untuk ERPNext/Frappe HR v15.
+Panduan **PPh 21 0.4.3**, untuk ERPNext/Frappe HR v15.
 Form dapat dibuka melalui workspace **HR > PPh 21** atau pencarian Desk.
 
 ## Tujuan dan tata letak
@@ -35,6 +35,28 @@ Satu batch dapat berisi lebih dari satu Company, sepanjang pengguna memiliki aks
 ke seluruh Employee dan akses membuat/mengubah profil yang bersangkutan.
 
 ## Langkah kerja
+
+### Izin untuk role payroll khusus
+
+Mulai 0.4.3, lookup setelah memilih karyawan mengikuti izin baca Employee, tanpa
+mewajibkan nama role HR Manager/System Manager. Versi sebelumnya memiliki pembatasan
+nama role tambahan pada endpoint tersebut, sehingga bisa muncul "Not permitted"
+meskipun izin DocType sudah diberikan melalui Role Permission Manager.
+
+| DocType | Izin sesuai pekerjaan pengguna |
+|---|---|
+| Employee | Read untuk karyawan yang akan diproses. |
+| Bulk PPh21 Employee Tax Profile | Read, Create, Write; Submit bila pengguna menerapkan batch. |
+| PPh21 Employee Tax Profile | Read dan Create untuk profil baru; Write untuk memperbarui profil lama. |
+| PPh21 Settings | Read untuk konfigurasi yang dipilih. |
+| Fiscal Year dan Company | Read untuk master yang digunakan. |
+
+User Permissions tetap membatasi Company/Employee yang dapat diakses. Hak Submit batch
+tidak menggantikan hak membuat atau mengubah profil individual. Role tambahan untuk
+visibilitas Workspace/report merupakan pengaturan terpisah dari izin lookup Employee.
+Hotfix tidak menambahkan role atau memberikan izin ke semua karyawan secara otomatis.
+
+### Pengisian dan penerapan
 
 1. Buka **Bulk PPh21 Employee Tax Profile > New**.
 2. Tentukan **Fiscal Year Default** dan **Metode Default**.

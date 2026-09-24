@@ -1,5 +1,13 @@
 # Upgrade ke 0.4.0 - beberapa Settings dalam satu Company
 
+## Hotfix 0.4.3 untuk role payroll khusus
+
+Jika role khusus ditolak setelah memilih Employee, deploy source 0.4.3, jalankan migrate,
+lalu reload Desk/login ulang untuk memuat sesi dan permission terbaru. Hotfix menghapus
+pembatasan nama role pada lookup Company/PTKP; izin baca dokumen Employee tetap diperiksa.
+Panduan izin setiap DocType tersedia pada [BULK_PROFILE.md](BULK_PROFILE.md).
+Paket 0.4.3 juga mencakup perbaikan migrasi workspace 0.4.2 di bawah ini.
+
 ## Hotfix 0.4.2 untuk migrasi yang gagal pada 0.4.1
 
 Jika log berhenti di `workspace.py` dengan
