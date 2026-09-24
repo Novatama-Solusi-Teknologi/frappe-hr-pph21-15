@@ -1,5 +1,7 @@
 """Idempotent installation; no Company, employee, account or payroll is activated."""
 
+from hashlib import sha256
+
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
@@ -13,6 +15,47 @@ COMPONENTS = {
     WITHHOLDING: ("Deduction", "PPH21_TAX", 0),
     REFUND: ("Earning", "PPH21_TAX_REFUND", 0),
 }
+COMPONENT_FIELDS = {ALLOWANCE: 'allowance_component', WITHHOLDING: 'withholding_component',
+                    REFUND: 'refund_component'}
+
+
+def component_role(name):
+    return next((base for base in COMPONENTS if name == base or
+                 (str(name).startswith(base + ' [') and str(name).endswith(']'))), None)
+
+
+def component_abbreviation(name):
+    base = component_role(name)
+    if not base:
+        frappe.throw('Komponen bukan komponen otomatis PPh21.')
+    abbr = COMPONENTS[base][1]
+    return abbr if name == base else abbr + '_' + sha256(name.encode()).hexdigest()[:12]
+
+
+def settings_components(settings):
+    result = {base: settings.get(field) for base, field in COMPONENT_FIELDS.items()}
+    if any(not name or component_role(name) != base for base, name in result.items()):
+        frappe.throw('Simpan ulang PPh21 Settings untuk membuat komponen payroll konfigurasi ini.')
+    return result
+
+
+def component_has_submitted_slips(name, company=None):
+    return bool(frappe.db.sql(
+        'SELECT ss.name FROM `tabSalary Slip` ss JOIN `tabSalary Detail` sd ON sd.parent=ss.name '
+        'WHERE sd.parenttype=\'Salary Slip\' AND sd.salary_component=%s AND ss.docstatus=1 '
+        + ('AND ss.company=%s ' if company else '') + 'LIMIT 1 FOR UPDATE',
+        (name, company) if company else (name,),
+    ))
+
+
+def settings_has_submitted_slips(name):
+    # The profile join includes legacy and zero-tax slips without generated detail rows.
+    return bool(frappe.db.sql(
+        'SELECT ss.name FROM `tabSalary Slip` ss '
+        'LEFT JOIN `tabPPh21 Employee Tax Profile` p ON p.name=ss.pph21_tax_profile '
+        'WHERE ss.docstatus=1 AND (ss.pph21_tax_settings=%s OR p.pph21_settings=%s) '
+        'LIMIT 1 FOR UPDATE', (name, name),
+    ))
 
 
 def check_versions():
@@ -41,6 +84,10 @@ def after_migrate():
     sync_mapping_codes()
     from frappe_hr_pph21.fiscal_year import backfill_fiscal_year_links
     backfill_fiscal_year_links()
+    from frappe_hr_pph21.settings import migrate_settings_links
+    migrate_settings_links()
+    from frappe_hr_pph21.workspace import sync_navigation
+    sync_navigation()
 
 
 def sync_mapping_codes():
@@ -54,10 +101,11 @@ def sync_mapping_codes():
 
 
 def sync_custom_fields():
-    fields = [dict(fieldname="pph21_tax_section", label="Frappe HR PPh21", fieldtype="Section Break",
+    fields = [dict(fieldname="pph21_tax_section", label="PPh 21", fieldtype="Section Break",
                    insert_after="base_total_in_words", collapsible=1)]
     specs = [
         ("pph21_tax_profile", "Profil Pajak PPh21", "Link", "PPh21 Employee Tax Profile"),
+        ("pph21_tax_settings", "PPh21 Settings", "Link", "PPh21 Settings"),
         ("pph21_tax_year", "Tahun Pajak", "Int", None),
         ("pph21_tax_month", "Masa Pajak", "Int", None),
         ("pph21_tax_final", "Masa Pajak Terakhir", "Check", None),
@@ -111,8 +159,11 @@ def sync_custom_fields():
     }, update=True)
 
 
-def create_components():
-    for name, (kind, abbr, taxable) in COMPONENTS.items():
+def create_components(settings=None):
+    names = settings_components(settings) if settings else {name: name for name in COMPONENTS}
+    for base, name in names.items():
+        kind, _, taxable = COMPONENTS[base]
+        abbr = component_abbreviation(name)
         if frappe.db.exists("Salary Component", name):
             continue  # Never overwrite the site's accounts or settings during migrate.
         frappe.get_doc(dict(doctype="Salary Component", salary_component=name,
@@ -120,18 +171,21 @@ def create_components():
                             is_tax_applicable=taxable, depends_on_payment_days=0,
                             variable_based_on_taxable_salary=0, statistical_component=0,
                             do_not_include_in_total=0, remove_if_zero_valued=1,
-                            description=f"Dihitung otomatis Frappe HR PPh21 ({RULE_VERSION}); jangan masukkan ke Salary Structure/Additional Salary."
+                            description=f"Dihitung otomatis Frappe HR PPh21 ({RULE_VERSION}); "
+                            + (f"Settings: {settings.name} / {settings.settings_name}. " if settings else '')
+                            + "Jangan masukkan ke Salary Structure/Additional Salary."
                             )).insert(ignore_permissions=True)
 
 
-def validate_component(name):
-    doc = frappe.get_doc("Salary Component", name)
-    kind, abbr, taxable = COMPONENTS[name]
+def validate_component(name, for_update=False):
+    doc = frappe.get_doc("Salary Component", name, for_update=for_update)
+    kind, _, taxable = COMPONENTS[component_role(name)]
+    abbr = component_abbreviation(name)
     expected = dict(type=kind, salary_component_abbr=abbr, is_tax_applicable=taxable,
                     depends_on_payment_days=0, variable_based_on_taxable_salary=0,
                     statistical_component=0, do_not_include_in_total=0,
                     is_flexible_benefit=0, amount_based_on_formula=0,
-                    only_tax_impact=0, do_not_include_in_accounts=0)
+                    only_tax_impact=0, do_not_include_in_accounts=0, disabled=0)
     for field, value in expected.items():
         actual = doc.get(field) or (0 if isinstance(value, int) else "")
         if actual != value:
@@ -142,14 +196,18 @@ def validate_component(name):
 
 
 def configure_accounts(settings):
-    for name in COMPONENTS:
+    for base, name in settings_components(settings).items():
         component = validate_component(name)
-        account = settings.expense_account if name == ALLOWANCE else settings.tax_payable_account
+        account = settings.expense_account if base == ALLOWANCE else settings.tax_payable_account
         rows = [row for row in component.accounts if row.company == settings.company]
         if len(rows) > 1:
             frappe.throw(f"Duplikasi account pada {name} untuk {settings.company}.")
         if rows:
-            rows[0].default_account = account
+            if rows[0].account == account:
+                continue
+            if rows[0].account and component_has_submitted_slips(name, settings.company):
+                frappe.throw(f'Akun {name} telah dipakai slip submitted; buat Settings baru untuk akun lain.')
+            rows[0].account = account
         else:
-            component.append("accounts", {"company": settings.company, "default_account": account})
+            component.append("accounts", {"company": settings.company, "account": account})
         component.save(ignore_permissions=True)

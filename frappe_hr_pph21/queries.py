@@ -38,7 +38,8 @@ def salary_component_query(doctype, txt, searchfield, start, page_len, filters=N
 
     rows = frappe.get_list(
         'Salary Component', fields=['name', 'salary_component_abbr', 'type'],
-        filters={'name': ['not in', list(COMPONENTS)], 'disabled': 0},
+        filters=[['name', 'not in', list(COMPONENTS)], ['disabled', '=', 0]]
+        + [['name', 'not like', base + ' [%'] for base in COMPONENTS],
         or_filters={'name': ['like', f'%{txt}%'], 'salary_component_abbr': ['like', f'%{txt}%']},
         start=max(0, cint(start)), page_length=min(50, max(1, cint(page_len))), order_by='name asc',
     )

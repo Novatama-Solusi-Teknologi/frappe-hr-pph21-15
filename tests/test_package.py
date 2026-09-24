@@ -28,7 +28,7 @@ class PackageTest(unittest.TestCase):
         hooks = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(hooks)
         self.assertEqual(hooks.required_apps, ['erpnext', 'hrms'])
-        paths = [hooks.before_install, hooks.after_install, hooks.after_migrate]
+        paths = [hooks.before_migrate, hooks.before_install, hooks.after_install, hooks.after_migrate]
         paths += list(hooks.override_doctype_class.values())
         paths += [p for events in hooks.doc_events.values() for p in events.values()]
         paths += list(hooks.has_permission.values())
@@ -39,7 +39,7 @@ class PackageTest(unittest.TestCase):
             self.assertIn(symbol, {node.name for node in tree.body if isinstance(node, (ast.ClassDef, ast.FunctionDef))})
 
     def test_workspace_links_and_reports(self):
-        workspace = json.loads((PACKAGE / 'frappe_hr_pph21/workspace/frappe_hr_pph21/frappe_hr_pph21.json').read_text())
+        workspace = json.loads((PACKAGE / 'frappe_hr_pph21/workspace/pph_21/pph_21.json').read_text())
         blocks = json.loads(workspace['content'])
         self.assertEqual(len(blocks), 7)
         for path in (PACKAGE / 'frappe_hr_pph21/report').glob('*/*.json'):

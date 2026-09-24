@@ -1,10 +1,11 @@
 frappe.ui.form.on("PPh21 Employee Tax Profile", {
 	setup(frm) {
+		frm.set_query("pph21_settings", () => ({ filters: { company: frm.doc.company || "", enabled: 1 } }));
 		frm.set_query("fiscal_year", () => ({ filters: { disabled: 0 } }));
 	},
 	async employee(frm) {
 		const employee = frm.doc.employee;
-		await frm.set_value({ company: null, employee_name: null, tax_id: "", ptkp_status: "", ter_category: "" });
+		await frm.set_value({ company: null, pph21_settings: null, employee_name: null, tax_id: "", ptkp_status: "", ter_category: "" });
 		if (!employee) {
 			return;
 		}

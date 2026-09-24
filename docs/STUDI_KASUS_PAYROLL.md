@@ -307,3 +307,20 @@ memilih Normal. App ini tidak mengirim laporan atau membuat bukti potong resmi D
 Hasil angka di panduan telah diperiksa melalui engine lokal. Instalasi, tampilan, dan
 jurnal pada site Frappe Cloud PT PUP belum diverifikasi langsung. Detail pengujian tersedia
 di [VALIDASI.md](VALIDASI.md).
+
+## Tambahan 0.4.0 - dua kelompok akun dalam satu Company
+
+| Employee contoh | PPh21 Settings | Metode | Beban tunjangan | Utang pajak |
+|---|---|---|---|---|
+| EMP-KANTOR | PUP - Kantor | Gross Up | Beban PPh21 Kantor | Utang PPh21 Kantor |
+| EMP-PRODUKSI | PUP - Produksi | Gross Up | Beban PPh21 Produksi | Utang PPh21 Produksi |
+
+Company keduanya PT PUP. Dengan input sama (TK/0, penghasilan taxable Rp10 juta,
+masa biasa, Floor IDR), masing-masing menghasilkan tunjangan dan potongan Rp230.179.
+Besaran pajak sama, tetapi Salary Component dan akun hasil payroll berbeda mengikuti Settings
+pilihan di profil. Pada Payroll Entry yang sama, periksa debit tunjangan kantor Rp230.179,
+debit tunjangan produksi Rp230.179, serta kredit ke masing-masing utang PPh21 Rp230.179.
+Contoh mengasumsikan tidak ada penghasilan/potongan lain dan belum masa rekonsiliasi.
+
+Jika metode Gross, tidak ada baris tunjangan; potongan tetap menuju akun utang Settings
+pegawai tersebut. Pengembalian pada masa terakhir juga memakai akun utang Settings itu.

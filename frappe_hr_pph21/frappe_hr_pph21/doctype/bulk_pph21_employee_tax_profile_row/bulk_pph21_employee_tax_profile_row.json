@@ -13,6 +13,7 @@
     "tax_id",
     "ptkp_status",
     "method",
+    "pph21_settings",
     "result_section",
     "tax_profile",
     "result_column",
@@ -69,7 +70,7 @@
       "fieldtype": "Data",
       "label": "NIK / NPWP",
       "reqd": 0,
-      "in_list_view": 1,
+      "in_list_view": 0,
       "columns": 2,
       "description": "Opsional. Jika diisi, gunakan 15/16 digit; kosong pada bulk tidak menghapus identitas profil lama."
     },
@@ -114,6 +115,15 @@
       "label": "Hasil",
       "read_only": 1,
       "no_copy": 1
+    },
+    {
+      "fieldname": "pph21_settings",
+      "label": "PPh21 Settings",
+      "fieldtype": "Link",
+      "options": "PPh21 Settings",
+      "in_list_view": 1,
+      "columns": 2,
+      "description": "Kosong: pertahankan Settings profil lama, atau pilih otomatis bila hanya ada satu Settings aktif."
     }
   ],
   "permissions": [],

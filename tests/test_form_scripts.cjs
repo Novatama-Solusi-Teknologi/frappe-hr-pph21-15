@@ -48,9 +48,10 @@ test('bulk new rows inherit defaults without overwriting existing rows', async (
 test('bulk employee changes clear stale identity and load defaults', async () => {
   const h=harness('bulk_pph21_employee_tax_profile');
   const dt='Bulk PPh21 Employee Tax Profile Row';
-  h.locals[dt]={r:{employee:'A',company:'Old',tax_id:'old-id',ptkp_status:'K/3'}};
+  h.locals[dt]={r:{employee:'A',company:'Old',tax_id:'old-id',ptkp_status:'K/3',pph21_settings:'Old setting'}};
   const action=h.handlers[dt].employee({},dt,'r'); await tick();
   assert.equal(h.locals[dt].r.tax_id,'');
+  assert.equal(h.locals[dt].r.pph21_settings,null);
   h.pending[0]({message:{company:'Company A',employee_name:'Alice',ptkp_status:'TK/0'}});
   await action;
   assert.equal(h.locals[dt].r.company,'Company A');
@@ -98,4 +99,18 @@ test('Fiscal Year links use master records on individual and bulk forms', () => 
     h.handlers[doctype].setup({set_query:(name,a,b)=>queries[name]=b||a});
     for (const name of expected) assert.equal(queries[name]().filters.disabled,0);
   }
+});
+
+test('settings links follow employee company on individual and bulk profiles', async () => {
+  const h=harness('pph21_employee_tax_profile'), queries={};
+  const frm={doc:{company:'A'},set_query:(field,a,b)=>queries[field]=b||a};
+  h.handlers['PPh21 Employee Tax Profile'].setup(frm);
+  assert.equal(queries.pph21_settings().filters.company,'A');
+  assert.equal(queries.pph21_settings().filters.enabled,1);
+  frm.doc.company='B';assert.equal(queries.pph21_settings().filters.company,'B');
+  const bulk=harness('bulk_pph21_employee_tax_profile'), bq={},dt='Bulk PPh21 Employee Tax Profile Row';
+  bulk.locals[dt]={one:{company:'A'},two:{company:'B'}};
+  bulk.handlers['Bulk PPh21 Employee Tax Profile'].setup({set_query:(field,a,b)=>bq[field]=b||a});
+  assert.equal(bq.pph21_settings({},dt,'one').filters.company,'A');
+  assert.equal(bq.pph21_settings({},dt,'two').filters.company,'B');
 });

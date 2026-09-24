@@ -53,6 +53,8 @@ class Environment:
             'EMP-A': Doc(company='Company A', employee_name='Alice', custom_ptkp='TK/0', date_of_joining='2026-01-01'),
             'EMP-B': Doc(company='Company B', employee_name='Bob', custom_ptkp='K/1', date_of_joining='2026-01-01'),
         }
+        self.settings = {'Settings A': Doc(name='Settings A',company='Company A',enabled=1),
+                         'Settings B': Doc(name='Settings B',company='Company B',enabled=1)}
         self.fiscal_years = {f'FY-{year}': Doc(name=f'FY-{year}', year_start_date=f'{year}-01-01', year_end_date=f'{year}-12-31', disabled=0, companies=[]) for year in (2024,2025,2026,2027)}
         self.frappe = types.ModuleType('frappe')
         self.frappe.whitelist = lambda: lambda fn: fn
@@ -61,8 +63,8 @@ class Environment:
         self.frappe.throw = lambda msg: self.fail(msg)
         self.frappe.get_doc = self.get_doc
         self.frappe.new_doc = lambda dt: self.profile_cls(doctype=dt, opening_reference='')
-        self.frappe.get_list = lambda *a, **kw: self.record_query(kw)
-        self.frappe.db = Box(exists=self.exists, savepoint=self.savepoint, rollback=self.rollback)
+        self.frappe.get_list = self.get_list
+        self.frappe.db = Box(exists=self.exists, savepoint=self.savepoint, rollback=self.rollback, sql=self.profile_sql)
         utils = types.ModuleType('frappe.utils')
         utils.cint = lambda v: int(v or 0)
         utils.getdate = lambda v=None: date.fromisoformat(str(v)[:10]) if v else date(2026,9,23)
@@ -73,15 +75,21 @@ class Environment:
         self.patcher.start()
         self.queries = load('bulk_queries_test', 'frappe_hr_pph21/queries.py')
         self.fiscal = load('fiscal_year_test', 'frappe_hr_pph21/fiscal_year.py')
-        self.query_patcher = patch.dict(sys.modules, {'frappe_hr_pph21.queries': self.queries, 'frappe_hr_pph21.fiscal_year': self.fiscal})
+        self.settings_helper = load('settings_bulk_test', 'frappe_hr_pph21/settings.py')
+        self.query_patcher = patch.dict(sys.modules, {'frappe_hr_pph21.settings': self.settings_helper, 'frappe_hr_pph21.queries': self.queries, 'frappe_hr_pph21.fiscal_year': self.fiscal})
         self.query_patcher.start()
         self.profile_cls = load('bulk_profile_test', 'frappe_hr_pph21/frappe_hr_pph21/doctype/pph21_employee_tax_profile/pph21_employee_tax_profile.py').PPh21EmployeeTaxProfile
         self.bulk_cls = load('bulk_controller_test', 'frappe_hr_pph21/frappe_hr_pph21/doctype/bulk_pph21_employee_tax_profile/bulk_pph21_employee_tax_profile.py').BulkPPh21EmployeeTaxProfile
     def close(self): self.query_patcher.stop(); self.patcher.stop()
+    def profile_sql(self, query, args):
+        if 'tabSalary Slip' in query:
+            return [('SLIP',)] if args[0] in self.locked else []
+        return []
     @staticmethod
     def fail(msg): raise ValueError(msg)
     def get_doc(self, dt, name, **kw):
         if kw.get('for_update'): self.read_locks.append((dt,name))
+        if dt == 'PPh21 Settings': return self.settings[name]
         if dt == 'Employee': return self.employees[name]
         if dt == 'Fiscal Year': return self.fiscal_years[name]
         if dt == PROFILE: return self.profile_cls(copy.deepcopy(self.profiles[name]))
@@ -94,6 +102,10 @@ class Environment:
         return None
     def savepoint(self, name): self.snapshot = copy.deepcopy(self.profiles)
     def rollback(self, **kw): self.profiles = self.snapshot; self.rollbacks += 1
+    def get_list(self, dt, **kwargs):
+        if dt == 'PPh21 Settings':
+            return [r.name for r in self.settings.values() if r.company == kwargs['filters']['company'] and r.enabled and not r.denied][:kwargs['page_length']]
+        return self.record_query(kwargs)
     def record_query(self, kwargs):
         self.query = kwargs
         return [Box(name='Gaji Pokok',salary_component_abbr='GP',type='Earning')]
@@ -216,7 +228,7 @@ class BulkProfileTest(unittest.TestCase):
         self.assertEqual(found,[['Gaji Pokok','GP','Earning']])
         self.assertEqual(self.env.query['page_length'],50)
         self.assertIn('salary_component_abbr',self.env.query['or_filters'])
-        self.assertIn('name',self.env.query['filters'])
+        self.assertTrue(any(f[0]=='name' for f in self.env.query['filters']))
 
     def test_batch_cannot_be_cancelled_as_if_profiles_were_undone(self):
         with self.assertRaisesRegex(ValueError,'tidak dapat dibatalkan'): self.env.batch().before_cancel()
@@ -329,6 +341,35 @@ class BulkProfileTest(unittest.TestCase):
         self.assertEqual({k:v for k,v in profile.items() if k!='fiscal_year'},before)
         self.env.fiscal.backfill_fiscal_year_links()
         self.assertEqual(len(updates),1)
+
+    def test_settings_must_be_explicit_when_multiple_choices_exist(self):
+        self.env.settings['Settings A2']=Doc(name='Settings A2',company='Company A',enabled=1)
+        batch=self.env.batch(('EMP-A',))
+        with self.assertRaisesRegex(ValueError,'Pilih PPh21 Settings'): self.env.submit(batch)
+        self.assertEqual(self.env.profiles,{})
+        batch=self.env.batch(('EMP-A',));batch.employees[0].pph21_settings='Settings A2'
+        self.env.submit(batch)
+        self.assertEqual(self.env.profiles['EMP-A-2026']['pph21_settings'],'Settings A2')
+
+    def test_settings_wrong_company_disabled_and_denied_rejected(self):
+        batch=self.env.batch(('EMP-A',));batch.employees[0].pph21_settings='Settings B'
+        with self.assertRaisesRegex(ValueError,'Company'): self.env.submit(batch)
+        batch.employees[0].pph21_settings='Settings A';self.env.settings['Settings A'].enabled=0
+        with self.assertRaisesRegex(ValueError,'Aktifkan'): self.env.submit(batch)
+        self.env.settings['Settings A'].enabled=1;self.env.settings['Settings A'].denied=True
+        with self.assertRaises(PermissionError): self.env.submit(batch)
+        self.assertEqual(self.env.profiles,{})
+
+    def test_blank_bulk_settings_preserves_selected_profile_settings(self):
+        self.env.submit(self.env.batch(('EMP-A',)))
+        self.env.settings['Settings A2']=Doc(name='Settings A2',company='Company A',enabled=1)
+        batch=self.env.batch(('EMP-A',));self.env.submit(batch)
+        self.assertEqual(batch.employees[0].pph21_settings,'Settings A')
+        self.assertEqual(batch.employees[0].result,'Tidak berubah')
+        self.env.locked.add('EMP-A-2026')
+        batch=self.env.batch(('EMP-A',));batch.employees[0].pph21_settings='Settings A2'
+        with self.assertRaisesRegex(ValueError,'submitted'): self.env.submit(batch)
+        self.assertEqual(self.env.profiles['EMP-A-2026']['pph21_settings'],'Settings A')
 
     def test_register_filter_resolves_master_year(self):
         self.env.frappe._dict = Box

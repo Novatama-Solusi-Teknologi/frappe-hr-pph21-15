@@ -1,14 +1,14 @@
 {
   "doctype": "Workspace",
-  "name": "Frappe HR PPh21",
-  "label": "Frappe HR PPh21",
-  "title": "Frappe HR PPh21",
+  "name": "PPh 21",
+  "label": "PPh 21",
+  "title": "PPh 21",
   "module": "Frappe HR PPh21",
   "icon": "organization",
   "public": 1,
   "is_hidden": 0,
   "sequence_id": 40,
-  "content": "[{\"id\": \"pph21_header\", \"type\": \"header\", \"data\": {\"text\": \"<b>Frappe HR PPh21 \\u00b7 PPh 21 Indonesia</b>\", \"col\": 12}}, {\"id\": \"pph21_0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Settings\", \"col\": 4}}, {\"id\": \"pph21_1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_bulk\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Bulk PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Register\", \"col\": 4}}, {\"id\": \"pph21_3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 TER Reference\", \"col\": 4}}, {\"id\": \"pph21_4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Salary Slip\", \"col\": 4}}]",
+  "content": "[{\"id\": \"pph21_header\", \"type\": \"header\", \"data\": {\"text\": \"<b>PPh 21</b>\", \"col\": 12}}, {\"id\": \"pph21_0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Settings\", \"col\": 4}}, {\"id\": \"pph21_1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_bulk\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Bulk PPh21 Employee Tax Profile\", \"col\": 4}}, {\"id\": \"pph21_2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 Register\", \"col\": 4}}, {\"id\": \"pph21_3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"PPh21 TER Reference\", \"col\": 4}}, {\"id\": \"pph21_4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Salary Slip\", \"col\": 4}}]",
   "shortcuts": [
     {
       "label": "PPh21 Settings",
@@ -64,5 +64,6 @@
     {
       "role": "System Manager"
     }
-  ]
+  ],
+  "parent_page": "HR"
 }

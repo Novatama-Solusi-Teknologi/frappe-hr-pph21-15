@@ -7,6 +7,7 @@ from frappe_hr_pph21.tax.engine import dec, profile_values
 from frappe_hr_pph21.tax.rules import SUPPORTED_YEARS
 from frappe_hr_pph21.queries import employee_values
 from frappe_hr_pph21.fiscal_year import tax_year_from_fiscal_year
+from frappe_hr_pph21.settings import selected_settings, default_settings
 
 
 class PPh21EmployeeTaxProfile(Document):
@@ -17,6 +18,8 @@ class PPh21EmployeeTaxProfile(Document):
             self.employee_name = values['employee_name']
             self.ptkp_status = self.ptkp_status or values['ptkp_status']
         self.tax_year = tax_year_from_fiscal_year(self.fiscal_year, self.company)
+        if not self.pph21_settings:
+            self.pph21_settings = default_settings(self.company)
         if not (self.tax_id or '').strip():
             self.tax_id = ''
             self.tax_identity_validated = 0
@@ -31,6 +34,7 @@ class PPh21EmployeeTaxProfile(Document):
         if self.tax_year not in SUPPORTED_YEARS:
             frappe.throw("Tahun pajak didukung: 2024–2026.")
         employee = frappe.get_doc("Employee", self.employee)
+        selected_settings(self.pph21_settings, self.company)
         if employee.company != self.company:
             frappe.throw("Company harus sama dengan perusahaan pegawai.")
         self.ter_category = profile_values(self.ptkp_status)[0]
@@ -66,8 +70,14 @@ class PPh21EmployeeTaxProfile(Document):
         if duplicate:
             frappe.throw("Profil pegawai untuk tahun ini sudah ada.")
         old = self.get_doc_before_save()
-        if old and frappe.db.exists("Salary Slip", {"pph21_tax_profile": self.name, "docstatus": 1}):
-            fields = ("employee", "company", "tax_year", "ptkp_status", "method", "tax_id", "tax_identity_validated",
+        used = False
+        if old:
+            # Serialize profile edits with payroll submission; use a current read after the lock.
+            frappe.db.sql('SELECT name FROM `tabPPh21 Employee Tax Profile` WHERE name=%s FOR UPDATE', (self.name,))
+            used = frappe.db.sql('SELECT name FROM `tabSalary Slip` WHERE pph21_tax_profile=%s '
+                                 'AND docstatus=1 LIMIT 1 FOR UPDATE', (self.name,))
+        if old and used:
+            fields = ("employee", "company", "pph21_settings", "tax_year", "ptkp_status", "method", "tax_id", "tax_identity_validated",
                       "resident_full_year", "permanent_employee", "facility", "opening_through_month",
                       "opening_gross", "opening_allowance", "opening_deductions", "opening_tax")
             if any(old.get(field) != self.get(field) for field in fields):

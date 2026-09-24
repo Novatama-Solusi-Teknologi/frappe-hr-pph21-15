@@ -8,6 +8,7 @@
     "employee_name",
     "identity_column",
     "company",
+    "pph21_settings",
     "fiscal_year",
     "tax_year",
     "tax_section",
@@ -229,6 +230,15 @@
       "fieldname": "notes",
       "label": "Catatan",
       "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "pph21_settings",
+      "label": "PPh21 Settings",
+      "fieldtype": "Link",
+      "options": "PPh21 Settings",
+      "reqd": 1,
+      "in_list_view": 1,
+      "description": "Pilih konfigurasi akun dan pemetaan komponen untuk pegawai ini."
     }
   ],
   "track_changes": 1,

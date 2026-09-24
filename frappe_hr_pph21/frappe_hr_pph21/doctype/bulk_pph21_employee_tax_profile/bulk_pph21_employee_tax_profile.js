@@ -1,5 +1,8 @@
 frappe.ui.form.on("Bulk PPh21 Employee Tax Profile", {
 	setup(frm) {
+		frm.set_query("pph21_settings", "employees", (doc, cdt, cdn) => ({
+			filters: { company: locals[cdt][cdn].company || "", enabled: 1 },
+		}));
 		frm.set_query("default_fiscal_year", () => ({ filters: { disabled: 0 } }));
 		frm.set_query("fiscal_year", "employees", () => ({ filters: { disabled: 0 } }));
 	},
@@ -22,7 +25,7 @@ frappe.ui.form.on("Bulk PPh21 Employee Tax Profile Row", {
 		const employee = row.employee;
 		// Changing employees must not carry another person's identity or tax status.
 		await frappe.model.set_value(cdt, cdn, {
-			company: null, employee_name: null, ptkp_status: "", tax_id: "", tax_profile: null, result: null,
+			company: null, pph21_settings: null, employee_name: null, ptkp_status: "", tax_id: "", tax_profile: null, result: null,
 		});
 		if (!employee) return;
 		const { message } = await frappe.call({

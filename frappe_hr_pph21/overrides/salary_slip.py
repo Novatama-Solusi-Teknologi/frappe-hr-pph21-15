@@ -15,7 +15,8 @@ from frappe.utils import cint, flt, getdate
 from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip
 
 from frappe_hr_pph21 import __version__
-from frappe_hr_pph21.setup import ALLOWANCE, COMPONENTS, REFUND, WITHHOLDING, validate_component
+from frappe_hr_pph21.settings import selected_settings
+from frappe_hr_pph21.setup import ALLOWANCE, COMPONENTS, REFUND, WITHHOLDING, validate_component, component_role, settings_components
 from frappe_hr_pph21.tax.engine import dec, final_period, monthly
 from frappe_hr_pph21.tax.rules import RULE_VERSION, check_tax_date, rules_hash
 
@@ -37,7 +38,7 @@ class PPh21SalarySlip(SalarySlip):
             settings, profile, start, end, employee = self._pph21_context()
             # Previous draft output never becomes a new taxable input.
             for table in ("earnings", "deductions"):
-                self.set(table, [row for row in self.get(table) if row.salary_component not in COMPONENTS])
+                self.set(table, [row for row in self.get(table) if not component_role(row.salary_component)])
             self._pph21_check_structure()
             super().calculate_net_pay(skip_tax_breakup_computation=True)
             self._pph21_apply(settings, profile, start, end, employee)
@@ -60,12 +61,6 @@ class PPh21SalarySlip(SalarySlip):
     def _pph21_context(self):
         if not self.company or not self.start_date or not self.end_date:
             frappe.throw("Lengkapi Company, Start Date, dan End Date sebelum menghitung PPh 21.")
-        settings_name = frappe.db.get_value("PPh21 Settings", {"company": self.company}, "name")
-        if not settings_name:
-            frappe.throw("Buat PPh21 Settings untuk perusahaan ini.")
-        settings = frappe.get_doc("PPh21 Settings", settings_name)
-        if not settings.enabled:
-            frappe.throw("Aktifkan PPh21 Settings untuk pegawai yang menggunakan Frappe HR PPh21.")
         start, end = getdate(self.start_date), getdate(self.end_date)
         try:
             check_tax_date(start)
@@ -101,6 +96,8 @@ class PPh21SalarySlip(SalarySlip):
             frappe.throw(f"Buat PPh21 Employee Tax Profile untuk {self.employee}, tahun {start.year}.")
         profile = frappe.get_doc("PPh21 Employee Tax Profile", profile_name,
                                  for_update=bool(getattr(self, "_pph21_locked", False)))
+        settings = selected_settings(profile.pph21_settings, self.company, check_permission=False,
+                                     for_update=bool(getattr(self, '_pph21_locked', False)))
         if not profile.permanent_employee or not profile.resident_full_year or profile.facility != "Normal":
             frappe.throw("Profil pajak di luar cakupan rilis: pegawai tetap, WP DN sepanjang tahun, fasilitas Normal.")
         if start.month <= cint(profile.opening_through_month):
@@ -114,7 +111,7 @@ class PPh21SalarySlip(SalarySlip):
         generated_abbrs = [value[1] for value in COMPONENTS.values()]
         for table in ("earnings", "deductions"):
             for row in list(structure.get(table)) + list(self.get(table)):
-                if row.salary_component in COMPONENTS:
+                if component_role(row.salary_component):
                     frappe.throw("Hapus komponen otomatis PPh21 dari Salary Structure; app menambahkannya sendiri.")
                 if row.variable_based_on_taxable_salary:
                     frappe.throw("Nonaktifkan komponen pajak standar untuk struktur pegawai PPh21.")
@@ -184,7 +181,7 @@ class PPh21SalarySlip(SalarySlip):
         details = []
         for table in ("earnings", "deductions"):
             for row in self.get(table):
-                if row.salary_component in COMPONENTS:
+                if component_role(row.salary_component):
                     frappe.throw("Additional Salary tidak boleh memakai komponen otomatis PPh21.")
                 treatment = mapping.get(row.salary_component)
                 if not treatment:
@@ -224,14 +221,16 @@ class PPh21SalarySlip(SalarySlip):
                 result = monthly(base, profile.ptkp_status, profile.method, settings.rounding)
         except ValueError as exc:
             frappe.throw(str(exc))
-        for name, amount in ((ALLOWANCE, result.allowance), (WITHHOLDING, result.withholding),
+        generated = settings_components(settings)
+        for base, amount in ((ALLOWANCE, result.allowance), (WITHHOLDING, result.withholding),
                              (REFUND, result.refund)):
-            component = validate_component(name)
-            expected_account = settings.expense_account if name == ALLOWANCE else settings.tax_payable_account
-            if not any(row.company == self.company and row.default_account == expected_account
+            name = generated[base]
+            component = validate_component(name, for_update=bool(getattr(self, '_pph21_locked', False)))
+            expected_account = settings.expense_account if base == ALLOWANCE else settings.tax_payable_account
+            if not any(row.company == self.company and row.account == expected_account
                        for row in component.accounts):
                 frappe.throw(f"Simpan ulang PPh21 Settings untuk memetakan akun {name}.")
-            table = "deductions" if name == WITHHOLDING else "earnings"
+            table = "deductions" if base == WITHHOLDING else "earnings"
             if amount:
                 self.append(table, dict(salary_component=name, abbr=component.salary_component_abbr,
                                         amount=float(amount), default_amount=float(amount),
@@ -252,7 +251,7 @@ class PPh21SalarySlip(SalarySlip):
                       "income_tax_deducted_till_date", "current_month_income_tax",
                       "future_income_tax_deductions", "total_income_tax"):
             self.set(field, 0)
-        values = dict(profile=profile.name, year=start.year, month=start.month, final=int(is_final),
+        values = dict(profile=profile.name, settings=settings.name, year=start.year, month=start.month, final=int(is_final),
                       category=profile.ter_category, method=profile.method, rule=RULE_VERSION,
                       base=result.base_gross, gross=result.taxable_gross, deductions=current_deductions,
                       allowance=result.allowance, withholding=result.withholding, refund=result.refund,
@@ -260,7 +259,8 @@ class PPh21SalarySlip(SalarySlip):
         for key, value in values.items():
             self.set("pph21_tax_" + key, float(value) if hasattr(value, "as_tuple") else value)
         snapshot = dict(app_version=__version__, rule_version=RULE_VERSION, rule_hash=rules_hash(),
-                        rounding=settings.rounding, employee=self.employee, company=self.company,
+                        rounding=settings.rounding, settings=settings.name, settings_name=settings.settings_name,
+                        generated_components=generated, employee=self.employee, company=self.company,
                         year=start.year, month=start.month, final=is_final, method=profile.method,
                         ptkp_status=profile.ptkp_status, category=profile.ter_category,
                         employment={"joining_date": str(getdate(employee.date_of_joining))},

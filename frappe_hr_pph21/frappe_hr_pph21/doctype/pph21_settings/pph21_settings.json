@@ -4,6 +4,7 @@
   "module": "Frappe HR PPh21",
   "engine": "InnoDB",
   "field_order": [
+    "settings_name",
     "company",
     "enabled",
     "settings_column",
@@ -13,18 +14,30 @@
     "expense_account",
     "accounts_column",
     "tax_payable_account",
+    "components_section",
+    "allowance_component",
+    "components_column",
+    "withholding_component",
+    "components_column_2",
+    "refund_component",
     "mapping_section",
     "component_mapping",
     "notes"
   ],
   "fields": [
     {
+      "fieldname": "settings_name",
+      "label": "Nama Pengaturan",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
       "fieldname": "company",
       "label": "Company",
       "fieldtype": "Link",
       "options": "Company",
       "reqd": 1,
-      "unique": 1,
       "in_list_view": 1
     },
     {
@@ -93,6 +106,44 @@
       "fieldname": "notes",
       "label": "Catatan",
       "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "allowance_component",
+      "label": "Komponen Tunjangan PPh21",
+      "fieldtype": "Link",
+      "options": "Salary Component",
+      "read_only": 1,
+      "no_copy": 1
+    },
+    {
+      "fieldname": "withholding_component",
+      "label": "Komponen Potongan PPh21",
+      "fieldtype": "Link",
+      "options": "Salary Component",
+      "read_only": 1,
+      "no_copy": 1
+    },
+    {
+      "fieldname": "refund_component",
+      "label": "Komponen Pengembalian PPh21",
+      "fieldtype": "Link",
+      "options": "Salary Component",
+      "read_only": 1,
+      "no_copy": 1
+    },
+    {
+      "fieldname": "components_section",
+      "fieldtype": "Section Break",
+      "label": "Komponen Otomatis",
+      "collapsible": 1
+    },
+    {
+      "fieldname": "components_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "components_column_2",
+      "fieldtype": "Column Break"
     }
   ],
   "track_changes": 1,
@@ -124,6 +175,9 @@
       "email": 0
     }
   ],
-  "autoname": "field:company",
-  "allow_rename": 0
+  "autoname": "format:PPH21-SET-{#####}",
+  "allow_rename": 0,
+  "title_field": "settings_name",
+  "show_title_field_in_link": 1,
+  "search_fields": "settings_name,company"
 }

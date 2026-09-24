@@ -8,6 +8,7 @@ from frappe.utils import cint
 from frappe_hr_pph21.queries import employee_values
 from frappe_hr_pph21.tax.rules import PTKP, SUPPORTED_YEARS
 from frappe_hr_pph21.fiscal_year import tax_year_from_fiscal_year
+from frappe_hr_pph21.settings import selected_settings
 
 PROFILE = 'PPh21 Employee Tax Profile'
 
@@ -47,6 +48,8 @@ class BulkPPh21EmployeeTaxProfile(Document):
                 frappe.throw(f'Baris {row.idx}: pilih PTKP yang valid; custom_ptkp kosong/tidak dikenali perlu diisi manual.')
             if row.method not in ('Gross', 'Gross Up'):
                 frappe.throw(f'Baris {row.idx}: pilih Gross atau Gross Up.')
+            if row.pph21_settings:
+                selected_settings(row.pph21_settings, row.company)
             if row.tax_id and not re.fullmatch(r'[0-9]{15,16}', re.sub(r'[ .-]', '', row.tax_id)):
                 frappe.throw(f'Baris {row.idx}: NIK/NPWP harus 15 atau 16 digit.')
             # Draft result columns are not accepted as evidence that a profile was processed.
@@ -81,6 +84,8 @@ class BulkPPh21EmployeeTaxProfile(Document):
                       fiscal_year=row.fiscal_year, ptkp_status=row.ptkp_status, method=row.method)
         if row.tax_id:
             fields['tax_id'] = row.tax_id
+        if row.pph21_settings:
+            fields['pph21_settings'] = row.pph21_settings
         if existing:
             profile = frappe.get_doc(PROFILE, existing, for_update=True)
             profile.check_permission('read')
@@ -89,7 +94,7 @@ class BulkPPh21EmployeeTaxProfile(Document):
                 fields['tax_identity_validated'] = 0
             if any(profile.get(key) != value for key, value in fields.items()):
                 # Normal validation protects profiles referenced by submitted Salary Slips.
-                # Opening balances and all fields outside the five bulk inputs remain unchanged.
+                # Blank settings and identity preserve existing values.
                 profile.update(fields)
                 profile.save()
                 row.result = 'Diperbarui'
@@ -104,6 +109,7 @@ class BulkPPh21EmployeeTaxProfile(Document):
             profile.insert()
             row.result = 'Dibuat'
         row.tax_profile = profile.name
+        row.pph21_settings = profile.pph21_settings
 
     def before_cancel(self):
         frappe.throw('Batch yang sudah diterapkan tidak dapat dibatalkan. Koreksi melalui profil individual atau batch baru sesuai proteksi payroll.')

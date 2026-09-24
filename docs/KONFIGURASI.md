@@ -1,11 +1,14 @@
-# Konfigurasi PT PUP - rilis 0.3.0
+# Konfigurasi PT PUP - rilis 0.4.0
 
 Form master memakai 2-3 kolom; tabel mapping tetap selebar form.
 Profil massal dapat dibuat melalui [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md).
 
 ## 1. Komponen dan akun
 
-Instalasi membuat tiga Salary Component berikut, tanpa account atau nilai payroll:
+Setiap **PPh21 Settings** baru membuat tiga komponen otomatis khusus konfigurasi itu.
+Nama komponennya memakai akhiran ID Settings, misalnya `[PPH21-SET-00001]`.
+Instalasi juga mempertahankan tiga komponen tanpa akhiran untuk Settings lama:
+
 
 | Komponen | Tipe | Taxable | Account setelah Settings disimpan |
 |---|---|---|---|
@@ -18,14 +21,24 @@ Komponen ditambahkan otomatis setelah HRMS menghitung gaji aktual. **Jangan mema
 Salary Structure/Additional Salary.** Pengaturan ini diperiksa kembali pada setiap kalkulasi.
 
 Di PPh21 Settings pilih akun Expense dan Liability non-group, aktif, IDR, milik perusahaan
-tersebut. Menyimpan Settings memetakan akun pada Salary Component untuk perusahaan ini.
+tersebut. Isi **Nama Pengaturan** agar mudah dikenali. Satu Company boleh memiliki beberapa
+Settings; menyimpan Settings memetakan akun ke komponen khususnya, bukan menimpa konfigurasi lain.
+Contoh:
+
+| Nama Settings | Company | Beban tunjangan | Utang PPh21 | Profil pegawai |
+|---|---|---|---|---|
+| PUP - Kantor | PT PUP | Beban PPh21 Kantor | Utang PPh21 Kantor | Kelompok kantor |
+| PUP - Produksi | PT PUP | Beban PPh21 Produksi | Utang PPh21 Produksi | Kelompok produksi |
+
+Nama akun di atas ilustrasi; pilih akun COA yang benar-benar ada. Kedua Settings tetap
+memerlukan mapping semua komponen yang muncul pada slip kelompoknya.
 Dropdown akun otomatis dibatasi Company yang dipilih, root type, IDR, aktif, dan non-group.
-Jika Company diganti, pilihan akun lama dikosongkan.
+Pada form baru, mengganti Company mengosongkan pilihan akun lama. Company tidak dapat diganti setelah Settings disimpan.
 Tidak ada Company, Chart of Accounts atau Journal Entry yang dibuat otomatis oleh instalasi.
 
 Pengaturan pembulatan awal Floor IDR (ke bawah rupiah penuh). Pilih Half Up IDR bila itu
 kebijakan payroll yang telah dicocokkan dengan pelaporan. Setelah ada slip submitted,
-perubahan pembulatan diblokir. Pembulatan PKP ke ribuan rupiah tetap wajib di engine.
+perubahan akun/pembulatan Settings yang digunakan diblokir. Pembulatan PKP ke ribuan rupiah tetap wajib di engine.
 
 ## 2. Pemetaan komponen
 
@@ -69,7 +82,10 @@ pada PPH21_TAX_ALLOW/PPH21_TAX atau field pph21_tax_* karena menyebabkan keterga
 
 ## 3. Profil pegawai
 
-Buat satu PPh21 Employee Tax Profile per Employee/tahun. Pilih Link **Fiscal Year** dari master ERPNext;
+Buat satu PPh21 Employee Tax Profile per Employee/tahun. Pilih **PPh21 Settings** yang aktif
+untuk Company pegawai. Saat pilihan kosong, app mengisi otomatis hanya bila ada satu Settings
+aktif yang dapat diakses; jika beberapa, pilih sendiri. Pilihan dikunci setelah profil dipakai slip submitted.
+ Pilih Link **Fiscal Year** dari master ERPNext;
 angka tahun dihitung dari tanggal periode, bukan nama record. Periode harus Januari-Desember, aktif,
 berlaku untuk Company pegawai, dan berada dalam tahun 2024-2026. Company mengikuti Employee. PTKP default dari `Employee.custom_ptkp` jika ada dan dikenali,
 namun tetap dapat dikoreksi. Nilai kosong/tidak dikenali perlu dipilih manual.

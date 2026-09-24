@@ -1,16 +1,26 @@
-# Validasi rilis 0.3.0
+# Validasi rilis 0.4.0
 
-Tanggal pemeriksaan: 23 September 2026.
+Tanggal pemeriksaan: 24 September 2026.
 
 ## Hasil lokal
+
+- Tambahan 0.4.0: Settings bernama per Company, komponen/akun terisolasi, profile/bulk selection,
+  penolakan Company salah/nonaktif/izin ditolak, snapshot Settings, migrasi idempotent,
+  komponen otomatis tidak boleh masuk struktur/Additional Salary, dan proteksi akun/profil
+  setelah slip submitted (termasuk pajak nol).
+- Metode asli HRMS v15 `get_salary_component_account` dan `get_account` diuji untuk
+  gabungan dua konfigurasi pada Company/cost center yang sama. Terbukti membaca field
+  `Salary Component Account.account` dan memisahkan nominal berdasarkan COA.
+  Source Payroll Entry diambil dari branch `version-15` pada 24 September 2026.
+  SHA256: `a3d1f609dafecc6ee2352245fb006a5fe219a32378245899b335334483397fcf`.
 
 - Tambahan 0.3.0: sumber Fiscal Year dari tanggal master, penolakan periode/Company salah,
   backfill tanpa menebak, penamaan profil saat insert, identitas opsional, pelestarian NIK
   lama pada bulk, filter register, dan payroll tanpa identitas terverifikasi.
 
 
-- **67 test Python lulus**: mesin pajak, schema/package, adapter v15, dan controller bulk.
-- **7 test JavaScript lulus**: filter akun, reset pilihan Company, default baris, identitas
+- **81 test Python lulus**: mesin pajak, schema/package, adapter v15, dan controller bulk.
+- **8 test JavaScript lulus**: filter akun, reset pilihan Company, default baris, identitas
   saat Employee berubah, lookup async yang terlambat, dan default profil individual.
 - Controller bulk diuji dengan database double transaksional: create/update/tidak berubah,
   saldo awal dipertahankan, input invalid, izin Employee/profil, konfirmasi wajib,
@@ -47,8 +57,16 @@ GitHub atau Marketplace. Repository tidak berisi kredensial atau data pegawai ny
 Instalasi membuat schema/custom fields dan komponen bernama PPh21, tetapi tidak mengaktifkan
 pegawai, menetapkan akun perusahaan, membuat Salary Slip, atau memposting jurnal.
 
-## Dokumentasi 0.3.0
+## Dokumentasi 0.4.0
 
-Panduan Markdown memuat bulk profile dan upgrade. PDF 11 halaman telah dirender dan
+Panduan Markdown memuat bulk profile, beberapa kelompok akun, dan upgrade 0.4.0. PDF 11 halaman telah dirender dan
 diperiksa secara visual; contoh angka payroll dipertahankan dari panduan sebelumnya.
 Tidak ada perubahan pada `tax/engine.py` atau master tarif dalam revisi ini.
+
+## Pemeriksaan tambahan 0.4.1
+
+Tiga tes migrasi workspace lulus: rename idempotent dan parent HR, pelestarian child menu,
+penolakan konflik workspace milik modul lain, serta penyembunyian duplikat tanpa menghapus
+kontennya. Empat tes package lulus; pyflakes dan git diff --check lulus. Perubahan menu belum
+diuji langsung pada Desk Frappe Cloud PT PUP. Tes payroll 0.4.0 di atas tidak diulang karena
+perubahan ini hanya label, metadata workspace, serta migrasi navigasi.

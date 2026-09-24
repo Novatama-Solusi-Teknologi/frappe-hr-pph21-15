@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.1 — 2026-09-24
+
+- Label app/workspace menjadi PPh 21; menu default sebagai child HR.
+- Migrasi menamai ulang workspace lama dan memperbarui parent menu tanpa membuat duplikat.
+- Nama teknis app/Module Def tetap; tidak ada perubahan payroll atau akun.
+
+## 0.4.0 — 2026-09-24
+
+- Beberapa PPh21 Settings bernama dalam satu Company; profil individual dan bulk memilih Settings.
+- Setiap Settings baru memiliki komponen allowance/withholding/refund tersendiri sehingga Payroll Entry standar memisahkan akun antar konfigurasi.
+- Perbaikan field akun Salary Component Account menjadi `account`, sesuai HRMS v15.
+- Snapshot/slip menyimpan Settings yang digunakan. Settings lintas Company/nonaktif ditolak; pilihan profil dan akun yang telah digunakan slip submitted dilindungi.
+- Migrasi mempertahankan nama dan komponen Settings lama; profil lama ditautkan hanya bila konfigurasi Company tidak ambigu.
+- Panduan konfigurasi, studi kasus, PDF, dan upgrade diperbarui. Tidak ada perubahan rumus atau tarif pajak.
+
 ## 0.3.1 — 2026-09-24
 
 - Default kedua checklist Pegawai tetap untuk tujuan PPh 21 dan WP dalam negeri sepanjang tahun pajak menjadi tercentang pada profil baru.

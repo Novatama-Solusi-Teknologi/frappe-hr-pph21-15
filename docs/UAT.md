@@ -89,3 +89,24 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
 - Identitas yang diisi tidak valid (misalnya 12 digit) ditolak; nol di awal tidak hilang.
 - Bulk dengan identitas kosong tidak menghapus NIK/NPWP lama. Identitas baru tidak otomatis
   dianggap tervalidasi; checkbox verifikasi bukan syarat payroll.
+
+## Tambahan UAT 0.4.0
+
+1. Upgrade site staging berisi Settings lama, profil, draft, dan slip submitted. Jalankan
+   migrate dua kali; nama/komponen Settings lama, snapshot, saldo awal dan nominal tetap.
+   Company tidak lagi unik di database. Profil lama terhubung ke Settings lama.
+2. Simpan Settings lama dan verifikasi field Account pada Salary Component Account.
+   Mapping akun berbeda yang sudah digunakan slip submitted harus ditolak, bukan ditimpa.
+3. Buat PUP - Kantor dan PUP - Produksi dalam Company yang sama, dengan dua pasangan akun.
+   Pastikan komponen/abbreviation berbeda dan pengaturan satu tidak menimpa yang lain.
+4. Pilih konfigurasi berbeda untuk dua pegawai. Coba Settings Company lain, nonaktif, dan
+   di luar User Permissions; pilihan salah harus ditolak di UI dan server.
+5. Buat dua slip Gross Up Rp10 juta TK/0 pada payroll sama. Periksa pajak Rp230.179
+   masing-masing, serta posting debit beban/kredit utang yang terpisah sesuai konfigurasi.
+6. Uji Gross, refund masa terakhir, hitung ulang draft, pembatalan/amendment, dan YTD.
+7. Bulk: Settings eksplisit per baris, kosong mempertahankan profil lama, konfigurasi
+   tunggal otomatis untuk profil baru, beberapa pilihan mewajibkan pemilihan. Uji rollback.
+8. Setelah submit, perubahan Settings profil serta akun/pembulatan Settings ditolak.
+   Edit akun langsung pada komponen yang dipakai juga ditolak. Settings lain tetap dapat diedit.
+9. Uji submit payroll bersamaan dengan edit akun/Settings pada koneksi berbeda;
+   tidak boleh ada snapshot dan akun jurnal yang berbeda akibat race.

@@ -37,9 +37,9 @@ def fail(message): raise ValueError(message)
 class Environment:
     def __init__(self):
         self.employee = Box(company='PT PUP', date_of_joining=date(2026,1,1), relieving_date=None, pph21_enabled=1)
-        self.profile = Box(name='EMP-001-2026', ptkp_status='TK/0', ter_category='A', method='Gross Up', permanent_employee=1, resident_full_year=1, facility='Normal', opening_through_month=0, opening_gross=0, opening_allowance=0, opening_deductions=0, opening_tax=0, opening_reference='')
+        self.profile = Box(name='EMP-001-2026', pph21_settings='PUP Standard', ptkp_status='TK/0', ter_category='A', method='Gross Up', permanent_employee=1, resident_full_year=1, facility='Normal', opening_through_month=0, opening_gross=0, opening_allowance=0, opening_deductions=0, opening_tax=0, opening_reference='')
         self.profile.tax_identity_validated = 1
-        self.settings = Box(enabled=1, company='PT PUP', rounding='Floor IDR', expense_account='Tax Expense', tax_payable_account='Tax Payable', component_mapping=[Box(salary_component='Basic', treatment='Taxable Cash')])
+        self.settings = Box(name='PUP Standard', settings_name='PUP Standard', allowance_component=ALLOWANCE, withholding_component=TAX, refund_component=REFUND, enabled=1, company='PT PUP', rounding='Floor IDR', expense_account='Tax Expense', tax_payable_account='Tax Payable', component_mapping=[Box(salary_component='Basic', treatment='Taxable Cash')])
         self.structure, self.history = Box(earnings=[], deductions=[]), []
         self.locked, self.newer = False, False
         self.frappe = types.ModuleType('frappe')
@@ -52,6 +52,8 @@ class Environment:
         self.setup = types.ModuleType('frappe_hr_pph21.setup')
         self.setup.ALLOWANCE, self.setup.WITHHOLDING, self.setup.REFUND, self.setup.COMPONENTS = ALLOWANCE,TAX,REFUND,COMPONENTS
         self.setup.validate_component = self.component
+        self.setup.component_role = lambda name: next((b for b in COMPONENTS if name == b or str(name).startswith(b+' [')),None)
+        self.setup.settings_components = lambda settings: {ALLOWANCE:settings.allowance_component,TAX:settings.withholding_component,REFUND:settings.refund_component}
     def get_value(self, dt, filters, field, **kw):
         if dt=='Employee': return self.employee.get(field)
         if dt=='Company': return 'IDR'
@@ -67,9 +69,10 @@ class Environment:
         if 'tabSalary Slip' in query:
             return self.history
         return [(params[0],)]
-    def component(self,name):
-        kind,abbr,taxable = COMPONENTS[name]
-        return Box(type=kind,salary_component_abbr=abbr,is_tax_applicable=taxable,accounts=[Box(company='PT PUP',default_account='Tax Expense' if name==ALLOWANCE else 'Tax Payable')])
+    def component(self,name,**kwargs):
+        base = self.setup.component_role(name)
+        kind,abbr,taxable = COMPONENTS[base]
+        return Box(type=kind,salary_component_abbr=abbr,is_tax_applicable=taxable,accounts=[Box(company='PT PUP',account=self.settings.expense_account if base==ALLOWANCE else self.settings.tax_payable_account)])
 
 class Base(Box):
     def calculate_component_amounts(self, table):
@@ -95,7 +98,10 @@ def load_controller(env):
     salary.SalarySlip = type('V15Base',(Base,),{n:ns[n] for n in names})
     spec = importlib.util.spec_from_file_location('pph21_adapter_contract',ROOT/'frappe_hr_pph21/overrides/salary_slip.py')
     with patch.dict(sys.modules,{'frappe':env.frappe,'frappe.utils':env.utils,'frappe_hr_pph21.setup':env.setup,'hrms.payroll.doctype.salary_slip.salary_slip':salary}):
-        mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+        helper_spec=importlib.util.spec_from_file_location('settings_adapter_test',ROOT/'frappe_hr_pph21/settings.py')
+        helper=importlib.util.module_from_spec(helper_spec);helper_spec.loader.exec_module(helper)
+        with patch.dict(sys.modules, {'frappe_hr_pph21.settings':helper}):
+            mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
     return mod.PPh21SalarySlip
 
 def row(name='Basic',amount=10000000,depends=1):
@@ -113,6 +119,38 @@ class V15AdapterTest(unittest.TestCase):
         self.assertFalse(s.native_tax_called); self.assertFalse(s.native_breakup_called)
         self.calc(); self.assertEqual(s.pph21_tax_snapshot,snapshot)
         self.assertEqual([r.salary_component for r in s.earnings].count(ALLOWANCE),1)
+    def test_settings_selected_by_profile_and_recorded_in_snapshot(self):
+        original_get_doc=self.env.frappe.get_doc
+        seen=[]
+        def get_doc(dt,name,**kwargs):
+            if dt=='PPh21 Settings': seen.append(name)
+            return original_get_doc(dt,name,**kwargs)
+        self.env.frappe.get_doc=get_doc
+        self.env.profile.pph21_settings='PUP Production'
+        self.env.settings.name='PUP Production'
+        self.env.settings.settings_name='PUP - Produksi'
+        self.env.settings.expense_account='Production Expense'
+        self.env.settings.tax_payable_account='Production Liability'
+        self.env.settings.allowance_component=ALLOWANCE+' [PUP Production]'
+        self.env.settings.withholding_component=TAX+' [PUP Production]'
+        self.env.settings.refund_component=REFUND+' [PUP Production]'
+        s=self.calc();snapshot=json.loads(s.pph21_tax_snapshot)
+        self.assertEqual(seen,['PUP Production'])
+        self.assertEqual(snapshot['settings'],'PUP Production')
+        self.assertEqual(snapshot['accounts'],{'allowance':'Production Expense','tax':'Production Liability'})
+        self.assertEqual(s.pph21_tax_settings,'PUP Production')
+        self.assertEqual(s.earnings[-1].salary_component,self.env.settings.allowance_component)
+        self.assertEqual(s.deductions[-1].salary_component,self.env.settings.withholding_component)
+        self.calc();self.assertEqual(len(s.earnings),2)
+        self.assertEqual(s.net_pay,10000000)
+
+    def test_profile_without_settings_or_wrong_company_cannot_run_payroll(self):
+        self.env.profile.pph21_settings=None
+        with self.assertRaisesRegex(ValueError,'Pilih PPh21 Settings'): self.calc()
+        self.env.profile.pph21_settings='Other'
+        self.env.settings.company='Other Company'
+        with self.assertRaisesRegex(ValueError,'Company'): self.calc()
+
     def test_prorata_precedes_tax(self):
         self.slip.payment_days=21;s=self.calc()
         self.assertEqual(s.pph21_tax_base,7000000);self.assertEqual(s.net_pay,7000000)

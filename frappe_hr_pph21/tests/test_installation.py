@@ -29,6 +29,7 @@ class TestPPh21Installation(FrappeTestCase):
             self.assertEqual(doc.modified, original[name]['modified'])
 
     def test_reports_and_workspace(self):
-        self.assertTrue(frappe.db.exists('Workspace', 'Frappe HR PPh21'))
+        self.assertTrue(frappe.db.exists('Workspace', 'PPh 21'))
+        self.assertEqual(frappe.db.get_value('Workspace', 'PPh 21', 'parent_page'), 'HR')
         for name in ('PPh21 Register', 'PPh21 TER Reference'):
             self.assertTrue(frappe.db.exists('Report', name))

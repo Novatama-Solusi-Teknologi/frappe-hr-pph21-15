@@ -1,7 +1,7 @@
 # Bulk PPh21 Employee Tax Profile
 
-Panduan **Frappe HR PPh21 0.3.0**, untuk ERPNext/Frappe HR v15.
-Form dapat dibuka melalui workspace **Frappe HR PPh21** atau pencarian Desk.
+Panduan **Frappe HR PPh21 0.4.0**, untuk ERPNext/Frappe HR v15.
+Form dapat dibuka melalui workspace **HR > PPh 21** atau pencarian Desk.
 
 ## Tujuan dan tata letak
 
@@ -112,3 +112,17 @@ master, walaupun angka internal dikirim berbeda melalui API.
 Pada profil baru, NIK/NPWP kosong disimpan kosong dan status verifikasi tetap nonaktif.
 Pada profil lama, NIK/NPWP kosong dalam bulk berarti tidak mengubah identitas. Untuk
 menghapus identitas secara sengaja, gunakan profil individual sesuai proteksi histori.
+
+## Pilihan PPh21 Settings per baris (0.4.0)
+
+Pilih **PPh21 Settings** untuk masing-masing karyawan. Dropdown hanya menampilkan konfigurasi
+aktif milik Company karyawan. Satu batch dapat berisi beberapa kelompok akun.
+
+- Profil baru: jika Settings kosong dan hanya satu pilihan aktif yang dapat diakses, app
+  mengisinya saat membuat profil. Jika beberapa atau tidak ada, Submit ditolak sampai dipilih.
+- Profil lama: Settings kosong pada baris bulk mempertahankan konfigurasi sebelumnya.
+- Settings dari perusahaan berbeda, nonaktif, atau tidak dapat diakses ditolak.
+- Mengganti Employee membersihkan pilihan Settings sebelumnya.
+- Profil yang sudah digunakan slip submitted tidak dapat dipindahkan ke Settings lain.
+- NIK/NPWP tetap opsional dan tersedia saat membuka detail baris; kolom grid menampilkan
+  Settings agar kelompok akun mudah dibandingkan.
