@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 2026-09-24
+
+- Default kedua checklist Pegawai tetap untuk tujuan PPh 21 dan WP dalam negeri sepanjang tahun pajak menjadi tercentang pada profil baru.
+- Nilai profil lama dan validasi cakupan perhitungan tetap dipertahankan. Profil baru melalui bulk sudah menggunakan kedua nilai tersebut.
+- Deploy pembaruan dan jalankan migrate agar default DocType tersinkronisasi.
+
 ## 0.1.0 — 2026-09-23
 
 Initial staging candidate for Frappe/ERPNext/HRMS v15:

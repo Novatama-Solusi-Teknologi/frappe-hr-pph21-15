@@ -81,7 +81,10 @@ Checkbox verifikasi identitas hanya catatan manual; kosong/tidak terverifikasi t
 penyimpanan profil atau payroll. App tidak menghubungi DJP dan tidak otomatis menandai identitas
 sebagai terverifikasi. Perhitungan tetap memakai skema Normal yang didukung app.
 
-Centang permanent employee dan resident full year hanya jika benar. Pegawai mulai Juli atau
+Mulai v0.3.1, **Pegawai tetap untuk tujuan PPh 21** dan **WP dalam negeri sepanjang tahun pajak**
+otomatis tercentang pada profil baru. Nilai profil yang sudah tersimpan tidak diubah.
+Periksa kesesuaiannya dengan kondisi pegawai; validasi cakupan perhitungan tetap berlaku.
+Pegawai mulai Juli atau
 resign April tetap dapat termasuk WP dalam negeri sepanjang tahun; ini berbeda dari baru
 menjadi/berhenti sebagai subjek pajak dalam negeri. Kasus kedua tidak dicakup rilis ini.
 Pilih fasilitas Normal; DTP diblokir karena memerlukan mekanisme pembayaran dan pelaporan berbeda.

@@ -135,7 +135,7 @@
       "fieldname": "resident_full_year",
       "label": "WP dalam negeri sepanjang tahun pajak",
       "fieldtype": "Check",
-      "default": "0",
+      "default": "1",
       "description": "Termasuk pegawai baru/resign yang kewajiban pajak subjektifnya tetap sepanjang tahun. Perubahan kewajiban subjektif belum didukung."
     },
     {
@@ -146,7 +146,7 @@
       "fieldname": "permanent_employee",
       "label": "Pegawai tetap untuk tujuan PPh 21",
       "fieldtype": "Check",
-      "default": "0"
+      "default": "1"
     },
     {
       "fieldname": "facility_column",
