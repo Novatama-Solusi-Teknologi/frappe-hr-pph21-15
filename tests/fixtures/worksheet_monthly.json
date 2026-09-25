@@ -1,0 +1,74 @@
+{
+  "app_version": "0.5.1",
+  "rule_version": "TER-2024",
+  "company": "PT Contoh",
+  "employee": "EMP-CONTOH",
+  "year": 2026,
+  "month": 9,
+  "method": "Gross Up",
+  "final": false,
+  "ptkp_status": "TK/0",
+  "category": "A",
+  "rounding": "Floor IDR",
+  "settings": "SET-001",
+  "settings_name": "Kantor",
+  "tax_period_basis": "posting_date",
+  "payment_date": "2026-09-25",
+  "payroll_start_date": "2026-08-26",
+  "payroll_end_date": "2026-09-25",
+  "employment_months": 9,
+  "prior_gross": "80000000",
+  "prior_deductions": "1600000",
+  "prior_tax": "1600000",
+  "prior_slips": [
+    "SLIP-CONTOH-08"
+  ],
+  "opening": {
+    "opening_through_month": 7,
+    "opening_gross": "70000000",
+    "opening_allowance": "0",
+    "opening_deductions": "1400000",
+    "opening_tax": "1400000",
+    "opening_reference": "Saldo awal contoh"
+  },
+  "accounts": {
+    "allowance": "Beban PPh21 Kantor",
+    "tax": "Utang PPh21 Kantor"
+  },
+  "components": [
+    {
+      "component": "Gaji Pokok",
+      "table": "earnings",
+      "treatment": "Taxable Cash",
+      "amount": "10000000"
+    },
+    {
+      "component": "BPJS Perusahaan",
+      "table": "earnings",
+      "treatment": "Taxable Noncash",
+      "amount": "400000"
+    },
+    {
+      "component": "Iuran Pensiun",
+      "table": "deductions",
+      "treatment": "Annual Deduction",
+      "amount": "200000"
+    }
+  ],
+  "result": {
+    "base_gross": "10400000",
+    "allowance": "266666",
+    "taxable_gross": "10666666",
+    "withholding": "266666",
+    "refund": "0",
+    "rate": "0.025",
+    "annual_gross": "0",
+    "job_expense": "0",
+    "annual_deductions": "0",
+    "ptkp": "0",
+    "pkp": "0",
+    "annual_tax": "0",
+    "prior_tax": "0",
+    "iterations": 0
+  }
+}

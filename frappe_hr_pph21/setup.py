@@ -122,6 +122,7 @@ def sync_custom_fields():
         ("pph21_tax_rate", "Tarif TER (%)", "Percent", None),
         ("pph21_tax_annual", "PPh Setahun (Masa Terakhir)", "Currency", "IDR"),
         ("pph21_tax_key", "Kunci Masa Pajak", "Data", None),
+        ("pph21_tax_worksheet", "Ringkasan Kertas Kerja", "HTML", None),
         ("pph21_tax_snapshot", "Kertas Kerja Pajak (JSON)", "Code", "JSON"),
     ]
     previous = "pph21_tax_section"
@@ -131,7 +132,7 @@ def sync_custom_fields():
         "pph21_tax_base": ("pph21_amounts_section", "Section Break", "Perhitungan PPh21"),
         "pph21_tax_allowance": ("pph21_allowance_column", "Column Break", None),
         "pph21_tax_refund": ("pph21_refund_column", "Column Break", None),
-        "pph21_tax_snapshot": ("pph21_snapshot_section", "Section Break", "Kertas Kerja PPh21"),
+        "pph21_tax_worksheet": ("pph21_snapshot_section", "Section Break", "Kertas Kerja PPh21"),
     }
     for name, label, kind, options in specs:
         if name in layout:
@@ -150,6 +151,8 @@ def sync_custom_fields():
             item["precision"] = "2" if kind == "Currency" else "4"
         if name == "pph21_tax_key":
             item.update(hidden=1, unique=1, allow_on_submit=1)
+        if name == "pph21_tax_snapshot":
+            item["hidden"] = 1
         fields.append(item)
         previous = name
     create_custom_fields({

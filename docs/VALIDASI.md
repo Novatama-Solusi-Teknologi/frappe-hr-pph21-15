@@ -138,3 +138,20 @@ PDF 0.5.0 tidak diubah; docs/HOTFIX_0_5_1.md menjelaskan perubahan dan langkah p
 Tidak ada penulisan ke master/struktur atau slip submitted lama. Tidak ada commit/push/deploy.
 Pengujian lokal masih menggunakan DB double, bukan Create/Submit Salary Slips dan jurnal
 pada site Frappe Cloud PT PUP.
+
+
+## Rilis 0.5.2 — tampilan kertas kerja
+
+**106 tes Python dan 16 tes JavaScript lulus.** Delapan tes JS baru memeriksa format rupiah
+serta persen TER, rekonsiliasi/refund, escape HTML, snapshot lama, JSON rusak, pembeda nilai
+kosong dari nol, integrasi ringkasan/dialog Salary Slip, serta fallback sebelum field HTML tersedia.
+Satu tes schema tambahan memastikan JSON tetap disimpan/read-only/hidden dan field HTML
+ringkasan terpasang. Pyflakes dan git diff --check lulus. Mesin pajak tidak diubah.
+
+Renderer aktual dijalankan pada Chrome headless dengan data ilustrasi, pada lebar 1120 px dan
+390 px. Tampilan bulanan serta refund masa terakhir diperiksa lewat screenshot; tidak ada
+overflow halaman, tabel komponen pada layar kecil digeser horizontal. Ini adalah preview
+HTML lokal, bukan screenshot dari Desk site PT PUP. Dialog extra-large sesuai source Frappe v15.
+
+Panduan baru docs/KERTAS_KERJA.md menjelaskan tampilan, sumber data, dan langkah upgrade.
+PDF konfigurasi 0.5.0 tetap disertakan. Tidak ada commit/push/deploy atau perubahan site produksi.

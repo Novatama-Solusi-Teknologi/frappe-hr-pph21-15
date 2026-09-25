@@ -74,6 +74,17 @@ class SettingsTest(unittest.TestCase):
                             component_mapping=[], rounding='Floor IDR')
         s.validate(); s.on_update()
         return s
+    def test_worksheet_custom_field_hides_json_without_removing_it(self):
+        captured={}
+        self.setup.create_custom_fields=lambda fields,**kwargs: captured.update(fields)
+        self.setup.sync_custom_fields()
+        fields={f['fieldname']:f for f in captured['Salary Slip']}
+        self.assertEqual(fields['pph21_tax_worksheet']['fieldtype'],'HTML')
+        self.assertEqual(fields['pph21_tax_worksheet']['insert_after'],'pph21_snapshot_section')
+        self.assertEqual(fields['pph21_tax_snapshot']['fieldtype'],'Code')
+        self.assertEqual(fields['pph21_tax_snapshot']['hidden'],1)
+        self.assertEqual(fields['pph21_tax_snapshot']['read_only'],1)
+
     def test_additional_salary_checks_actual_submitted_work_period(self):
         original_get=self.frappe.db.get_value
         self.frappe.db.get_value=lambda dt, filters, field, **kw: 1 if dt=='Employee' else original_get(dt,filters,field,**kw)

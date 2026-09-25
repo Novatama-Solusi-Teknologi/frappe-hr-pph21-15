@@ -205,3 +205,10 @@ Mulai 0.5.1, app menyelaraskan kedua flag pengecualian dari master Salary Compon
 sudah disimpan ke baris slip Taxable Noncash sebelum menghitung total gaji. Ini menangani
 flag lama pada Salary Structure/draft. Statistical Component harus tetap tidak dicentang,
 termasuk pada baris struktur. [Langkah penanganan error](HOTFIX_0_5_1.md).
+
+
+## Membaca kertas kerja
+
+Mulai 0.5.2, tombol **Kertas Kerja PPh 21** pada Salary Slip menampilkan tabel yang dapat
+langsung dibaca. Ringkasan nominal tampil pada form; JSON audit disembunyikan.
+Lihat [panduan kertas kerja](KERTAS_KERJA.md) untuk rincian bagian dan slip versi lama.
