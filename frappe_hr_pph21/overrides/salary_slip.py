@@ -1,11 +1,10 @@
 """v15 integration. Let HRMS finish prorating amounts before PPh 21.
 
 Submitted Salary Slips and immutable snapshots are the tax ledger. There is
-one canonical slip per employee/company/calendar month. An Employee Tax
-Profile row lock serializes submit/cancel, and a unique key guards races.
+one canonical slip per employee/company/payment month. An Employee Tax
+Profile and Employee row locks serialize submit/cancel; a unique key guards races.
 """
 
-import calendar
 from datetime import date
 from hashlib import sha256
 import json
@@ -27,9 +26,9 @@ class PPh21SalarySlip(SalarySlip):
         if not active:
             if self.get("pph21_tax_profile"):
                 frappe.throw("Slip ini memakai Frappe HR PPh21; aktifkan kembali PPh21 Enabled pada pegawai.")
-            if self.employee and self.company and self.start_date and frappe.db.exists("Salary Slip", {
+            if self.employee and self.company and self.posting_date and frappe.db.exists("Salary Slip", {
                 "employee": self.employee, "company": self.company, "docstatus": 1,
-                "pph21_tax_year": getdate(self.start_date).year, "pph21_tax_profile": ["is", "set"],
+                "pph21_tax_year": getdate(self.posting_date).year, "pph21_tax_profile": ["is", "set"],
             }):
                 frappe.throw("Pegawai sudah memakai Frappe HR PPh21 tahun ini. Jangan menonaktifkan di tengah tahun tanpa migrasi/koreksi riwayat.")
             return super().calculate_net_pay(skip_tax_breakup_computation=skip_tax_breakup_computation)
@@ -59,48 +58,50 @@ class PPh21SalarySlip(SalarySlip):
         return super().compute_income_tax_breakup()
 
     def _pph21_context(self):
-        if not self.company or not self.start_date or not self.end_date:
-            frappe.throw("Lengkapi Company, Start Date, dan End Date sebelum menghitung PPh 21.")
+        if not self.company or not self.start_date or not self.end_date or not self.posting_date:
+            frappe.throw("Lengkapi Company, Start Date, End Date, dan Posting Date (tanggal pembayaran) sebelum menghitung PPh 21.")
         start, end = getdate(self.start_date), getdate(self.end_date)
+        paid = getdate(self.posting_date)
         try:
-            check_tax_date(start)
+            check_tax_date(paid)
         except ValueError as exc:
             frappe.throw(str(exc))
-        if (start.year, start.month) != (end.year, end.month) or end < start:
-            frappe.throw("Frappe HR PPh21 memerlukan satu periode dalam satu bulan kalender.")
+        if end < start or (end - start).days >= 31:
+            frappe.throw("Periode payroll Monthly harus berurutan dan maksimum 31 hari; boleh lintas bulan.")
+        if paid < start:
+            frappe.throw("Posting Date (tanggal pembayaran) tidak boleh sebelum Start Date payroll.")
         if self.payroll_frequency != "Monthly" or self.salary_slip_based_on_timesheet:
             frappe.throw("Rilis ini hanya mendukung payroll Monthly tanpa Timesheet.")
         if self.currency != "IDR" or frappe.db.get_value("Company", self.company, "default_currency") != "IDR":
             frappe.throw("Salary Slip dan Company harus menggunakan IDR.")
         if dec(self.exchange_rate) != 1:
             frappe.throw("Exchange rate payroll IDR harus 1.")
-        employee = frappe.get_doc("Employee", self.employee)
+        employee = frappe.get_doc("Employee", self.employee,
+                                  for_update=bool(getattr(self, "_pph21_locked", False)))
         if employee.company != self.company:
             frappe.throw("Perusahaan pegawai berbeda dari Salary Slip.")
         join = getdate(employee.date_of_joining)
         leave = getdate(employee.relieving_date) if employee.relieving_date else None
-        period_start = max(start.replace(day=1), join)
-        period_end = end.replace(day=calendar.monthrange(end.year, end.month)[1])
-        if leave:
-            period_end = min(period_end, leave)
         if join > end or (leave and leave < start):
             frappe.throw("Periode slip di luar masa kerja pegawai.")
-        if start not in (start.replace(day=1), period_start) or end not in (
-            end.replace(day=calendar.monthrange(end.year, end.month)[1]), period_end
-        ):
-            frappe.throw("Gunakan satu slip untuk seluruh bulan kalender (atau sampai tanggal resign).")
+        if paid < join:
+            frappe.throw("Tanggal pembayaran tidak boleh sebelum tanggal mulai bekerja.")
+        if leave and (paid.year, paid.month) > (leave.year, leave.month):
+            frappe.throw("Pembayaran setelah bulan resign belum didukung; tinjau masa pajak terakhir sebelum memproses payroll.")
+        if leave and (paid.year, paid.month) == (leave.year, leave.month) and end < leave:
+            frappe.throw("Slip masa terakhir harus mencakup sampai tanggal resign. Sesuaikan End Date dan gabungkan seluruh penghasilan terakhir.")
         profile_name = frappe.db.get_value("PPh21 Employee Tax Profile", {
-            "employee": self.employee, "company": self.company, "tax_year": start.year,
+            "employee": self.employee, "company": self.company, "tax_year": paid.year,
         }, "name")
         if not profile_name:
-            frappe.throw(f"Buat PPh21 Employee Tax Profile untuk {self.employee}, tahun {start.year}.")
+            frappe.throw(f"Buat PPh21 Employee Tax Profile untuk {self.employee}, tahun {paid.year}.")
         profile = frappe.get_doc("PPh21 Employee Tax Profile", profile_name,
                                  for_update=bool(getattr(self, "_pph21_locked", False)))
         settings = selected_settings(profile.pph21_settings, self.company, check_permission=False,
                                      for_update=bool(getattr(self, '_pph21_locked', False)))
         if not profile.permanent_employee or not profile.resident_full_year or profile.facility != "Normal":
             frappe.throw("Profil pajak di luar cakupan rilis: pegawai tetap, WP DN sepanjang tahun, fasilitas Normal.")
-        if start.month <= cint(profile.opening_through_month):
+        if paid.month <= cint(profile.opening_through_month):
             frappe.throw("Masa ini sudah dicakup saldo awal; tidak boleh dihitung dua kali.")
         return settings, profile, start, end, employee
 
@@ -119,37 +120,45 @@ class PPh21SalarySlip(SalarySlip):
                 if any(abbr in expression for abbr in generated_abbrs) or "pph21_tax_" in expression:
                     frappe.throw("Formula gaji tidak boleh bergantung pada hasil PPh 21 PPh21 (circular dependency).")
 
-    def _pph21_history(self, profile, start, employee):
-        filters = {
-            "employee": self.employee, "company": self.company, "docstatus": 1,
-            "start_date": ["between", [date(start.year, 1, 1), date(start.year, 12, 31)]],
-            "name": ["!=", self.name or ""],
-        }
-        fields = ["name", "start_date", "end_date", "pph21_tax_profile", "pph21_tax_gross",
-                  "pph21_tax_allowance", "pph21_tax_deductions", "pph21_tax_withholding",
-                  "pph21_tax_refund", "pph21_tax_final", "pph21_tax_snapshot"]
-        if getattr(self, "_pph21_locked", False):
-            # Current read, not an old REPEATABLE READ snapshot created during
-            # validate. Columns are constants, never supplied by a caller.
-            rows = frappe.db.sql(
-                "SELECT " + ", ".join(fields) + " FROM `tabSalary Slip` "
-                "WHERE employee=%s AND company=%s AND docstatus=1 "
-                "AND start_date BETWEEN %s AND %s AND name!=%s ORDER BY start_date FOR UPDATE",
-                (self.employee, self.company, date(start.year, 1, 1), date(start.year, 12, 31), self.name or ""),
-                as_dict=True,
-            )
-        else:
-            rows = frappe.get_all("Salary Slip", filters=filters, fields=fields, order_by="start_date asc")
+    def _pph21_history(self, profile, paid, employee):
+        # Stored tax periods remain authoritative for legacy submitted slips.
+        # Also fetch any overlapping work period, including across tax years.
+        year_start, year_end = date(paid.year, 1, 1), date(paid.year, 12, 31)
+        fields = ["name", "start_date", "end_date", "posting_date", "pph21_tax_year", "pph21_tax_month",
+                  "pph21_tax_profile", "pph21_tax_gross", "pph21_tax_allowance", "pph21_tax_deductions",
+                  "pph21_tax_withholding", "pph21_tax_refund", "pph21_tax_final", "pph21_tax_snapshot"]
+        # Identical selection during preview and locked submit. Parameterized SQL
+        # expresses the grouped overlap condition without broadening company scope.
+        rows = frappe.db.sql(
+            "SELECT " + ", ".join(fields) + " FROM `tabSalary Slip` "
+            "WHERE employee=%s AND company=%s AND docstatus=1 AND name!=%s "
+            "AND (pph21_tax_year=%s OR posting_date BETWEEN %s AND %s "
+            "OR (start_date<=%s AND end_date>=%s)) ORDER BY posting_date, name"
+            + (" FOR UPDATE" if getattr(self, "_pph21_locked", False) else ""),
+            (self.employee, self.company, self.name or "", paid.year, year_start, year_end,
+             self.end_date, self.start_date), as_dict=True,
+        )
         cutoff = cint(profile.opening_through_month)
         seen, prior_names = set(), []
         gross, deductions, tax = dec(profile.opening_gross), dec(profile.opening_deductions), dec(profile.opening_tax)
+        join = getdate(employee.date_of_joining)
+        first_payment_month = max(year_start, join).month
+        if not cutoff and getdate(self.start_date) <= join <= getdate(self.end_date):
+            # A new joiner after the cutoff can receive their first salary next month.
+            first_payment_month = paid.month
         for row in rows:
-            month = getdate(row.start_date).month
+            tracked = bool(row.pph21_tax_profile)
+            year = cint(row.pph21_tax_year) if tracked else getdate(row.posting_date).year
+            month = cint(row.pph21_tax_month) if tracked else getdate(row.posting_date).month
+            if getdate(row.start_date) <= getdate(self.end_date) and getdate(row.end_date) >= getdate(self.start_date):
+                frappe.throw(f"Periode kerja tumpang tindih dengan slip submitted {row.name}. Batalkan/amend slip asal terlebih dahulu.")
+            if year != paid.year:
+                continue
             if month <= cutoff:
                 if row.pph21_tax_profile:
                     frappe.throw("Saldo awal tumpang tindih dengan slip PPh21 submitted.")
                 continue
-            if month >= start.month:
+            if month >= paid.month:
                 frappe.throw(f"Slip {row.name} sudah submitted pada masa yang sama/lebih baru. Batalkan berurutan dari masa terbaru.")
             if row.pph21_tax_profile != profile.name or month in seen:
                 frappe.throw(f"Riwayat masa {month} tidak valid/duplikat. Lengkapi saldo awal atau koreksi slip {row.name}.")
@@ -163,17 +172,19 @@ class PPh21SalarySlip(SalarySlip):
                 # Future relieving dates may legitimately be entered after earlier payrolls.
             }:
                 frappe.throw("Tanggal mulai bekerja berubah setelah payroll. Koreksi riwayat sebelum menghitung ulang.")
+            first_payment_month = min(first_payment_month, month)
+            if old_snapshot.get("first_payment_month"):
+                first_payment_month = max(first_payment_month, cint(old_snapshot["first_payment_month"]))
             seen.add(month)
             prior_names.append(row.name)
             gross += dec(row.pph21_tax_gross)
             deductions += dec(row.pph21_tax_deductions)
             tax += dec(row.pph21_tax_withholding) - dec(row.pph21_tax_refund)
-        first = max(date(start.year, 1, 1), getdate(employee.date_of_joining)).month
-        expected = set(range(max(first, cutoff + 1), start.month))
+        expected = set(range(max(first_payment_month, cutoff + 1), paid.month))
         if seen != expected:
             missing = sorted(expected - seen)
             frappe.throw(f"Riwayat payroll belum lengkap untuk bulan {missing}. Isi saldo awal migrasi atau submit slip yang belum ada.")
-        return gross, deductions, tax, prior_names
+        return gross, deductions, tax, prior_names, first_payment_month
 
     def _pph21_apply(self, settings, profile, start, end, employee):
         mapping = {row.salary_component: row.treatment for row in settings.component_mapping}
@@ -208,11 +219,12 @@ class PPh21SalarySlip(SalarySlip):
                 details.append(dict(component=row.salary_component, table=table,
                                     treatment=treatment, amount=str(amount),
                                     additional_salary=row.get("additional_salary")))
-        prior_gross, prior_deductions, prior_tax, prior_names = self._pph21_history(profile, start, employee)
+        paid = getdate(self.posting_date)
+        prior_gross, prior_deductions, prior_tax, prior_names, first_payment_month = self._pph21_history(profile, paid, employee)
         leave = getdate(employee.relieving_date) if employee.relieving_date else None
-        is_final = start.month == 12 or bool(leave and (leave.year, leave.month) == (start.year, start.month))
-        first = max(date(start.year, 1, 1), getdate(employee.date_of_joining))
-        months = start.month - first.month + 1
+        is_final = paid.month == 12 or bool(leave and (leave.year, leave.month) == (paid.year, paid.month))
+        first = max(date(paid.year, 1, 1), getdate(employee.date_of_joining))
+        months = paid.month - first.month + 1
         try:
             if is_final:
                 result = final_period(base, prior_gross, prior_deductions + current_deductions,
@@ -251,7 +263,7 @@ class PPh21SalarySlip(SalarySlip):
                       "income_tax_deducted_till_date", "current_month_income_tax",
                       "future_income_tax_deductions", "total_income_tax"):
             self.set(field, 0)
-        values = dict(profile=profile.name, settings=settings.name, year=start.year, month=start.month, final=int(is_final),
+        values = dict(profile=profile.name, settings=settings.name, payment_date=paid, year=paid.year, month=paid.month, final=int(is_final),
                       category=profile.ter_category, method=profile.method, rule=RULE_VERSION,
                       base=result.base_gross, gross=result.taxable_gross, deductions=current_deductions,
                       allowance=result.allowance, withholding=result.withholding, refund=result.refund,
@@ -261,7 +273,10 @@ class PPh21SalarySlip(SalarySlip):
         snapshot = dict(app_version=__version__, rule_version=RULE_VERSION, rule_hash=rules_hash(),
                         rounding=settings.rounding, settings=settings.name, settings_name=settings.settings_name,
                         generated_components=generated, employee=self.employee, company=self.company,
-                        year=start.year, month=start.month, final=is_final, method=profile.method,
+                        year=paid.year, month=paid.month, final=is_final, method=profile.method,
+                        tax_period_basis="posting_date", payment_date=str(paid),
+                        payroll_start_date=str(start), payroll_end_date=str(end),
+                        first_payment_month=first_payment_month,
                         ptkp_status=profile.ptkp_status, category=profile.ter_category,
                         employment={"joining_date": str(getdate(employee.date_of_joining))},
                         relieving_date=str(leave) if leave else None, employment_months=months,
@@ -305,6 +320,9 @@ class PPh21SalarySlip(SalarySlip):
         self.pph21_tax_key = None  # Release unique active-month key atomically with cancellation.
 
     def _pph21_lock_profile(self):
+        # Serialize across profile years too, so changing a payment year cannot
+        # submit overlapping work periods under different annual profile locks.
+        frappe.db.sql("SELECT name FROM `tabEmployee` WHERE name=%s FOR UPDATE", (self.employee,))
         frappe.db.sql("SELECT name FROM `tabPPh21 Employee Tax Profile` WHERE name=%s FOR UPDATE",
                       (self.pph21_tax_profile,))
         self._pph21_locked = True

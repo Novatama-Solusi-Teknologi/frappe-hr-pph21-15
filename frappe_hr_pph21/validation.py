@@ -22,12 +22,9 @@ def validate_additional_salary(doc, method=None):
         start = end = getdate(doc.payroll_date)
     else:
         return
-    from calendar import monthrange
-    start = start.replace(day=1)
-    end = end.replace(day=monthrange(end.year, end.month)[1])
     if frappe.db.exists("Salary Slip", {
         "employee": doc.employee, "company": doc.company, "docstatus": 1,
-        "start_date": ["between", [start, end]], "pph21_tax_profile": ["is", "set"],
+        "start_date": ["<=", end], "end_date": [">=", start], "pph21_tax_profile": ["is", "set"],
     }):
         frappe.throw("Masa pajak sudah memiliki slip submitted. Batalkan/amend slip sebelum menambah penghasilan masa tersebut.")
 

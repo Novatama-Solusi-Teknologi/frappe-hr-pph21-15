@@ -28,12 +28,12 @@ def heading(text): add(text,'h')
 def page(label,title,subtitle):
  if story: story.append(PageBreak())
  add(label,'label');add(title,'title');add(subtitle)
-def table(headers,rows,widths):
+def table(headers,rows,widths,padding=9):
  data=[[p(h,'th') for h in headers]]+[[p(str(v),'cell') for v in r] for r in rows]
  t=Table(data,colWidths=widths,repeatRows=1,hAlign='LEFT')
  t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),NAVY),('VALIGN',(0,0),(-1,-1),'TOP'),
   ('ROWBACKGROUNDS',(0,1),(-1,-1),[LIGHT,colors.white]),('LEFTPADDING',(0,0),(-1,-1),9),
-  ('RIGHTPADDING',(0,0),(-1,-1),9),('TOPPADDING',(0,0),(-1,-1),9),('BOTTOMPADDING',(0,0),(-1,-1),9),
+  ('RIGHTPADDING',(0,0),(-1,-1),9),('TOPPADDING',(0,0),(-1,-1),padding),('BOTTOMPADDING',(0,0),(-1,-1),padding),
   ('LINEBELOW',(0,0),(-1,0),1,TEAL)]))
  story.extend([t,Spacer(1,9)])
 def callout(title,body):
@@ -44,8 +44,8 @@ def callout(title,body):
 def step(num,title,body):
  story.append(KeepTogether([p(f'{num}. {title}','h'),p(body)]))
 
-page('PANDUAN PRAKTIS / RILIS 0.4.1','Setting PPh21 payroll<br/>dan studi kasus','ERPNext / Frappe HR v15 - untuk HR, payroll, dan finance PT PUP.')
-callout('Baru: beberapa Settings dalam satu perusahaan','Beri nama konfigurasi, pilih akun beban dan utang masing-masing, lalu hubungkan karyawan ke Settings melalui Tax Profile. Contoh: PUP - Kantor dan PUP - Produksi.')
+page('PANDUAN PRAKTIS / RILIS 0.5.0','Setting PPh21 payroll<br/>dan studi kasus','ERPNext / Frappe HR v15 - untuk HR, payroll, dan finance PT PUP.')
+callout('Baru: payroll cutoff, pajak menurut pembayaran','Periode kerja boleh lintas bulan. Isi Posting Date dengan tanggal pembayaran: periode 26 Agustus-25 September dibayar 25 September masuk masa September. Contoh dan langkah pemulihan ada di halaman 12.')
 table(['1. Konfigurasi','2. Profil pegawai','3. Hasil payroll'],[
  ['Nama Settings, Company, akun dan mapping komponen.','Pilih Settings dan Fiscal Year. Individual atau bulk.','Periksa pajak, Net Pay, komponen, serta jurnal.']], [166,167,166])
 heading('Empat skenario utama')
@@ -57,8 +57,7 @@ heading('Isi panduan')
 table(['Bagian','Hal.','Bagian','Hal.'],[
  ['Settings dan mapping','02','Membaca gross-up','07'],['Profil individual','03','BPJS, noncash, THR','08'],
  ['Bulk profile','04','Desember dan resign','09'],['Dua kelompok akun','05','Saldo awal dan kontrol','10'],
- ['Empat kasus utama','06','Upgrade dan referensi','11']], [195,40,224,40])
-add('Rumus dan tarif pajak tidak berubah pada revisi 0.4.1. Contoh merupakan data ilustrasi; nama akun disesuaikan dengan COA PT PUP.','small')
+ ['Empat kasus utama','06','Upgrade dan referensi','11'],['Periode cutoff dan pembayaran','12','', '']], [195,40,224,40],padding=6)
 
 page('01 / SETTINGS DAN MAPPING','Konfigurasi bernama, akun terpisah','Menu: PPh21 Settings > New. Satu Company boleh memiliki beberapa Settings.')
 step(1,'Isi Nama Pengaturan dan Company','Contoh PUP - Kantor. ID dibuat otomatis, misalnya PPH21-SET-00001. Pilih akun Expense untuk beban tunjangan dan Liability untuk utang PPh21. Akun harus aktif, IDR, non-group, dan milik Company tersebut.')
@@ -77,7 +76,7 @@ step(1,'Pilih Employee dan PPh21 Settings','Company/nama mengikuti Employee. Pil
 step(2,'Pilih Fiscal Year dan PTKP','Fiscal Year berasal dari master ERPNext. Tahun diambil dari tanggal periode, bukan nama record. PTKP mengikuti custom_ptkp jika tersedia dan dikenali; nilai kosong/tidak dikenal perlu dipilih manual.')
 step(3,'Pilih metode; NIK/NPWP opsional','Pilih Gross atau Gross Up. NIK/NPWP boleh kosong; jika diisi, format 15/16 digit diperiksa. Verifikasi identitas hanya catatan manual dan tidak menghambat payroll bila belum dicentang.')
 step(4,'Periksa default dan saldo awal','Pegawai tetap untuk tujuan PPh21 dan WP dalam negeri sepanjang tahun otomatis tercentang pada profil baru. Fasilitas Normal. Lengkapi saldo awal jika migrasi, lalu aktifkan PPh21 Enabled pada Employee.')
-step(5,'Jalankan payroll standar','Gunakan struktur Monthly dan Salary Structure Assignment. THR/bonus melalui Additional Salary ke slip bulan yang sama. Periksa Settings, tunjangan, potongan, Net Pay, dan kertas kerja sebelum Submit.')
+step(5,'Jalankan payroll standar','Gunakan struktur Monthly dan Assignment. Posting Date menentukan masa pembayaran. THR/bonus melalui Additional Salary dalam periode kerja slip. Periksa masa pajak, Settings, tunjangan, potongan, dan Net Pay sebelum Submit.')
 callout('Fiscal Year yang didukung','Periode aktif 1 Januari-31 Desember dalam tahun yang sama, pada 2024-2026, berlaku untuk Company pegawai. Contoh record bernama Periode Payroll PUP dengan tanggal tahun 2026 menghasilkan tahun pajak 2026.')
 add('Settings pada profil yang sudah dipakai slip submitted tidak dapat diganti langsung. Koreksi mengikuti pembatalan slip berurutan; untuk tahun berikutnya pilih Settings pada profil tahun berikutnya.','small')
 
@@ -181,7 +180,7 @@ step(2,'Periksa jurnal untuk dua Settings','Pada satu Payroll Entry, pastikan be
 callout('Pajak nol tetap perlu riwayat','Gaji Rp5 juta, TK/0, Gross pada masa biasa menghasilkan TER 0%. Tetap gunakan Taxable Cash dan PPh21 Enabled; penghasilan masuk rekonsiliasi tahunan.')
 add('Instalasi/migrate, UI Desk, izin Company, transaksi bersamaan, dan posting jurnal belum diuji pada site PT PUP. Tes lokal tidak menggantikan UAT pada bench lengkap.','small')
 
-page('10 / UPGRADE DAN REFERENSI','Upgrade ke rilis 0.4.1','Menu: HR &gt; PPh 21. Nama teknis app: frappe_hr_pph21.')
+page('10 / UPGRADE DAN REFERENSI','Upgrade ke rilis 0.5.0','Menu: HR &gt; PPh 21. Nama teknis app: frappe_hr_pph21.')
 step(1,'Deploy source dan migrate','Push source ke repository app, deploy ke staging Frappe Cloud, jalankan migrate, lalu reload browser. Workspace lama berganti nama menjadi PPh 21 di bawah HR. Tidak perlu uninstall/reinstall.')
 step(2,'Periksa Settings lama, lalu Save','Nama tampilan menjadi Company - Standar; ID dan komponen lama dipertahankan. Save memastikan mapping pada field Account yang dibaca HRMS v15. Mapping lama berbeda yang sudah digunakan slip submitted tidak ditimpa otomatis.')
 step(3,'Buat konfigurasi baru dan pilih di profil','Tambahkan Settings untuk kelompok akun lain. Profil lama ditautkan otomatis bila tepat satu Settings cocok dengan Company. Jika ambigu, pilih sendiri. Snapshot dan nominal slip lama tidak ditulis ulang.')
@@ -196,7 +195,26 @@ refs=[
  ('FAQ DJP PMK 66/2023 nomor 7 - reimbursement','https://stats.pajak.go.id/sites/default/files/2023-12/FAQ%20Terkait%20PMK-66%20Tahun%202023.pdf'),
  ('Materi DJP bukti potong A1 - iuran','https://pajak.go.id/sites/default/files/2025-12/Pembuatan%20Bukti%20Pemotongan%20PPh%20Pasal%2021-Tahunan%20A1%20%20%281%29.pdf')]
 for i,(label,url) in enumerate(refs,1): add(f'<link href="{url}" color="#007e87">[{i}] {label}</link>','small')
-add('Panduan source: docs/UPGRADE_0_4.md, KONFIGURASI.md, BULK_PROFILE.md, STUDI_KASUS_PAYROLL.md, UAT.md, dan VALIDASI.md.','small')
+add('Panduan source: docs/UPGRADE_0_5.md, UPGRADE_0_4.md, KONFIGURASI.md, BULK_PROFILE.md, STUDI_KASUS_PAYROLL.md, UAT.md, dan VALIDASI.md.','small')
+
+
+page('11 / PERIODE CUTOFF','Periode kerja dan masa pajak','Mulai 0.5.0: Start/End Date untuk HRMS; Posting Date untuk masa pembayaran.')
+table(['Field Payroll Entry','Contoh PT PUP','Hasil'],[
+ ['Start Date','26 Agustus 2026','Awal absensi/prorata.'],
+ ['End Date','25 September 2026','Akhir absensi/prorata.'],
+ ['Posting Date','25 September 2026','Masa September 2026.'],
+ ['Tax Profile / saldo awal','Fiscal Year 2026 / sampai bulan 8','Saldo awal Jan-Agustus bila migrasi.']], [139,158,202])
+add('Posting Date harus tanggal pembayaran yang benar. Tanggal klik Submit dan tanggal Bank Payment terpisah tidak menggeser masa pajak otomatis. Jika Jan-Agustus sudah ada sebagai slip PPh21, jangan isi saldo awal untuk masa yang sama.','small')
+table(['Periode kerja','Dibayar (Posting Date)','Masa pajak'],[
+ ['26 Agu-25 Sep 2026','1 Oktober 2026','Oktober; riwayat sampai September diperlukan.'],
+ ['26 Nov-25 Des 2026','25 Desember 2026','Desember; rekonsiliasi tahunan.'],
+ ['26 Des 2025-25 Jan 2026','25 Januari 2026','Januari; profil 2026.']], [166,151,182])
+heading('Mengulang Create Salary Slips yang gagal')
+add('Deploy source 0.5.0, jalankan migrate, lalu reload Desk. Periksa Posting Date, profil dan riwayat/saldo awal. Jika belum ada slip, ulangi Create Salary Slips. Jika ada draft parsial, periksa dan hitung ulang draft melalui alur HRMS agar tidak membuat duplikat.','small')
+add('Periksa Tanggal Pembayaran (Posting Date), Tahun Pajak dan Masa Pajak pada bagian PPh 21 Salary Slip. Snapshot menyimpan tanggal pembayaran dan periode kerja. Uji nominal serta jurnal pada staging sebelum produksi.','small')
+heading('Batas dan riwayat')
+add('Satu slip per pegawai/Company/masa pembayaran, maksimum 31 hari kalender dalam periode. Slip submitted lama tidak direlabel. Payroll Date bonus harus masuk Start/End Date slip. Resign harus dicakup slip final dan dibayar dalam bulan resign; pembayaran bulan sesudahnya belum didukung. Tahun pembayaran 2027 masih di luar master aturan.','small')
+add('Basis pembayaran dipakai untuk alur PT PUP yang dikonfirmasi. Saat terutang menurut PMK 168/2023 Pasal 21 tetap mengikuti pembayaran atau terutangnya penghasilan, mana lebih dahulu; app tidak mendeteksi tanggal pengakuan utang terpisah. [2]','small')
 
 
 def decorate(canvas,doc):
@@ -204,13 +222,13 @@ def decorate(canvas,doc):
  canvas.drawString(48,807,'PT PUP / PPH 21');canvas.drawRightString(547,807,'PANDUAN PAYROLL / V15')
  canvas.setStrokeColor(TEAL);canvas.line(48,795,547,795)
  canvas.setFont('Helvetica',8);canvas.setFillColor(INK)
- canvas.drawString(48,32,'PPh 21 0.4.1 | 24 September 2026')
- canvas.drawRightString(547,32,f'{doc.page:02d} / 11');canvas.restoreState()
+ canvas.drawString(48,32,'PPh 21 0.5.0 | 25 September 2026')
+ canvas.drawRightString(547,32,f'{doc.page:02d} / 12');canvas.restoreState()
 
 if __name__ == '__main__':
  out=Path(sys.argv[1]) if len(sys.argv)>1 else Path(__file__).resolve().parents[1]/'docs/Panduan_PPh21_Payroll_PT_PUP.pdf'
  out.parent.mkdir(parents=True,exist_ok=True)
  doc=SimpleDocTemplate(str(out),pagesize=A4,leftMargin=48,rightMargin=48,topMargin=65,bottomMargin=53,
-                       title='Panduan PPh21 Payroll PT PUP - v0.4.1',author='PT PUP',pageCompression=1)
+                       title='Panduan PPh21 Payroll PT PUP - v0.5.0',author='PT PUP',pageCompression=1)
  doc.build(story,onFirstPage=decorate,onLaterPages=decorate)
  print(out)

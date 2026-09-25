@@ -1,6 +1,6 @@
 # PPh 21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.4.3**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.5.0**, kandidat untuk uji staging.
 
 Nama tampilan: **PPh 21**. Menu default: **HR > PPh 21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -20,6 +20,17 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Snapshot kertas kerja pada setiap slip; register dapat diekspor melalui fitur report Frappe.
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
+
+## Baru di 0.5.0: payroll cutoff dan masa pembayaran
+
+Periode 26 Agustus–25 September 2026 dengan Posting Date 25 September 2026
+menggunakan masa pajak **September 2026**. Start/End Date tetap menjadi periode kerja
+HRMS untuk absensi/prorata. Isi Posting Date dengan tanggal pembayaran yang benar;
+app tidak membaca tanggal Bank Payment/Payment Entry untuk menggeser masa secara otomatis.
+Riwayat, saldo awal, pemilihan profil tahunan, kunci duplikasi, dan rekonsiliasi mengikuti masa pajak.
+Slip submitted lama tetap memakai masa tersimpan dan tidak dihitung ulang saat upgrade.
+
+Lihat [panduan upgrade dan contoh tanggal](docs/UPGRADE_0_5.md).
 
 ## Perbaikan 0.4.3
 
@@ -104,13 +115,13 @@ Buka workspace **HR > PPh 21** sebagai **HR Manager** atau **System Manager**:
 Detail pemetaan BPJS, contoh setup, jurnal, dan saldo awal ada di [KONFIGURASI.md](docs/KONFIGURASI.md).
 Panduan langkah demi langkah dengan kasus taxable/nonobjek, Gross/Gross Up, BPJS, THR,
 dan masa terakhir ada di [STUDI_KASUS_PAYROLL.md](docs/STUDI_KASUS_PAYROLL.md).
-Versi siap baca/cetak: [Panduan PDF 0.4.1](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
+Versi siap baca/cetak: [Panduan PDF 0.5.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
 
-## Batas rilis 0.4.0
+## Batas rilis 0.5.0
 
 - Pegawai tetap untuk tujuan PPh 21, WP dalam negeri sepanjang tahun, fasilitas Normal. NIK/NPWP opsional; app tetap memakai tarif Normal.
 - Tahun yang dibundel: **2024–2026**. Tahun lain diblokir sampai master diperbarui.
-- **Satu Salary Slip per pegawai/perusahaan/bulan kalender.** THR/bonus melalui Additional Salary ke slip tersebut.
+- **Satu Salary Slip per pegawai/perusahaan/masa pembayaran.** Periode kerja boleh lintas bulan (maksimum 31 hari); masa pajak mengikuti Posting Date. THR/bonus melalui Additional Salary ke slip tersebut.
   Gaji dan THR dalam dua slip terpisah/off-cycle belum didukung. Tidak mengubah transaksi lama otomatis.
 - Tidak mencakup DTP, PPh 26, pegawai tidak tetap, pesangon final, gross-up sebagian,
   perubahan kewajiban pajak subjektif, rehire dalam tahun yang sama, dan penggabungan pemberi kerja lain.

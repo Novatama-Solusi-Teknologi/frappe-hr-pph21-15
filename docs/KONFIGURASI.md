@@ -131,12 +131,26 @@ slip PPh21 submitted. Masa terakhir/resign tidak boleh dimasukkan sebagai saldo 
 
 ## 5. Payroll bulanan dan THR
 
-Payroll Period sebaiknya Januari–Desember. Pakai Payroll Frequency Monthly dan Salary Slip
-berdasarkan bulan kalender. Periode boleh dimulai tanggal join atau berakhir tanggal resign.
-Masa pajak ditentukan dari bulan Start/End Date slip, bukan bulan tombol submit ditekan.
-Pastikan periode mencerminkan saat terutang pajak pada administrasi perusahaan.
+Pakai Payroll Frequency Monthly. Periode kerja boleh lintas bulan dengan panjang maksimum
+31 hari, misalnya 26 Agustus–25 September 2026. Start/End Date tetap untuk absensi/prorata HRMS.
+**Posting Date adalah tanggal pembayaran yang dipakai app untuk tahun dan masa pajak.**
+Contoh Posting Date 25 September 2026 masuk September, memakai Tax Profile Fiscal Year 2026.
+Tanggal klik Submit maupun tanggal Bank Payment terpisah tidak mengubah masa pajak otomatis.
+Pastikan Posting Date sesuai administrasi pembayaran/masa terutang perusahaan. Payroll Period
+HRMS tetap dikonfigurasi sesuai kebutuhan HRMS; Fiscal Year profil pajak harus Januari–Desember.
 
-Tambahkan THR/bonus melalui Additional Salary sebelum slip bulan tersebut disubmit. Bila ada
+Saldo awal sampai Agustus berarti masa pembayaran Januari–Agustus. Riwayat mulai September
+harus berurutan. Karyawan baru yang mulai bekerja dalam periode kerja pertama boleh menerima
+gaji pertama pada bulan berikutnya tanpa slip nihil pada bulan join; bulan pembayaran pertama
+disimpan dalam kertas kerja. Bila pegawai sudah bekerja sebelum periode pertama yang diinput,
+riwayat sebelumnya tetap diperlukan atau harus dicakup saldo awal.
+
+Untuk resign, slip terakhir harus mencakup sampai tanggal berhenti dan dibayar dalam bulan
+resign. Pembayaran setelah bulan resign masih di luar cakupan. Jangan memaksakan tanggal palsu;
+tinjau proses payroll final. Lihat [contoh cutoff dan upgrade](UPGRADE_0_5.md).
+
+Tambahkan THR/bonus melalui Additional Salary sebelum slip masa tersebut disubmit.
+Payroll Date Additional Salary harus masuk Start/End Date slip agar dipungut HRMS. Bila ada
 pembayaran THR lebih dulu, proses pembayaran/advance mengikuti akuntansi perusahaan, tetapi
 kertas kerja pajak bulan tetap satu slip gabungan. App ini belum mengelola pajak dua slip/off-cycle.
 

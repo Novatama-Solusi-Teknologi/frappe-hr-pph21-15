@@ -95,3 +95,24 @@ menggunakan ignore_permissions dan tidak mengembalikan NIK/NPWP atau field Emplo
 git diff --check lulus. Tidak ada perubahan perhitungan pajak. Izin diuji memakai
 Frappe double; pengaturan Role Permission/User Permission serta impersonation pada
 site PT PUP belum diverifikasi langsung dari lingkungan ini.
+
+
+## Rilis 0.5.0 — cutoff dan tanggal pembayaran
+
+Pemeriksaan 25 September 2026: **99 tes Python dan 8 tes JavaScript lulus**.
+Tes Python mencakup 14 tambahan terkait periode/tanggal pembayaran dan Additional Salary:
+periode 26 Agustus–25 September, prorata, bulan bayar Oktober, pergantian tahun, pemilihan
+profil, saldo awal, riwayat tersimpan legacy, duplikasi masa, overlap periode kerja,
+rekonsiliasi Desember, karyawan baru setelah cutoff, resign, tahun di luar aturan, dan bonus.
+Pemilihan SQL riwayat dijalankan juga pada SQLite dengan data lintas Company/Employee dan
+status cancelled; ini memeriksa logika seleksi, bukan isolasi transaksi MariaDB/Frappe.
+Jalur preview dan submit memakai seleksi yang sama; submit menambah FOR UPDATE serta
+penguncian Employee/profil. Penguncian konkuren tetap memerlukan UAT pada database nyata.
+
+Tarif dan rumus di tax/engine.py serta tax/rules.py tidak diubah. Lima metode aritmetika
+asli HRMS v15 tetap dipakai pada controller contract tests. HRMS mengambil Posting Date
+Payroll Entry ke argumen pembuatan Salary Slip; absensi/prorata mengikuti Start/End Date.
+PDF 12 halaman dirender dan diperiksa, termasuk tabel cutoff baru di halaman 12.
+
+Tidak dilakukan migrasi, pembuatan slip, posting jurnal, commit/push atau deploy ke site PT PUP.
+Gunakan UAT.md dan UPGRADE_0_5.md untuk verifikasi pada staging.

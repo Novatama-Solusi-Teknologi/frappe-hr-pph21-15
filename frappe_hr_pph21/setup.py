@@ -107,6 +107,7 @@ def sync_custom_fields():
         ("pph21_tax_profile", "Profil Pajak PPh21", "Link", "PPh21 Employee Tax Profile"),
         ("pph21_tax_settings", "PPh21 Settings", "Link", "PPh21 Settings"),
         ("pph21_tax_year", "Tahun Pajak", "Int", None),
+        ("pph21_tax_payment_date", "Tanggal Pembayaran (Posting Date)", "Date", None),
         ("pph21_tax_month", "Masa Pajak", "Int", None),
         ("pph21_tax_final", "Masa Pajak Terakhir", "Check", None),
         ("pph21_tax_category", "Kategori TER", "Data", None),

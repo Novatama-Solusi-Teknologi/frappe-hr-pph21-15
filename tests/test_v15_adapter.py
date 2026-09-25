@@ -7,6 +7,7 @@ from decimal import Decimal
 import importlib.util
 import json
 import os
+import sqlite3
 from pathlib import Path
 import sys
 import types
@@ -62,8 +63,7 @@ class Environment:
         if dt=='Salary Component': return 0
         raise AssertionError(dt)
     def sql(self, query, params, **kwargs):
-        assert 'FOR UPDATE' in query
-        self.locked = True
+        self.locked = self.locked or 'FOR UPDATE' in query
         if 'pph21_tax_month>' in query:
             return [('NEWER',)] if self.newer else []
         if 'tabSalary Slip' in query:
@@ -111,7 +111,7 @@ def row(name='Basic',amount=10000000,depends=1):
 class V15AdapterTest(unittest.TestCase):
     def setUp(self):
         self.env=Environment();cls=load_controller(self.env)
-        self.slip=cls(employee='EMP-001',company='PT PUP',name='JAN',start_date=date(2026,1,1),end_date=date(2026,1,31),currency='IDR',exchange_rate=1,payroll_frequency='Monthly',salary_slip_based_on_timesheet=0,salary_structure='Test',earnings=[],deductions=[],total_working_days=30,payment_days=30,payroll_period=None,total_loan_repayment=0,hour_rate=0,_salary_structure_doc=Box(salary_component=None),joining_date=date(2026,1,1),relieving_date=None,templates={'earnings':[row()],'deductions':[]})
+        self.slip=cls(employee='EMP-001',company='PT PUP',name='JAN',posting_date=date(2026,1,31),start_date=date(2026,1,1),end_date=date(2026,1,31),currency='IDR',exchange_rate=1,payroll_frequency='Monthly',salary_slip_based_on_timesheet=0,salary_structure='Test',earnings=[],deductions=[],total_working_days=30,payment_days=30,payroll_period=None,total_loan_repayment=0,hour_rate=0,_salary_structure_doc=Box(salary_component=None),joining_date=date(2026,1,1),relieving_date=None,templates={'earnings':[row()],'deductions':[]})
     def calc(self): self.slip.calculate_net_pay();return self.slip
     def test_repeated_calculation_and_native_tax_suppression(self):
         s=self.calc(); snapshot=s.pph21_tax_snapshot
@@ -187,30 +187,34 @@ class V15AdapterTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'di luar cakupan'): self.calc()
     def test_calendar_and_currency_guards(self):
         self.slip.end_date=date(2026,2,1)
-        with self.assertRaisesRegex(ValueError,'satu bulan'): self.calc()
-        self.slip.end_date=date(2026,1,15)
-        with self.assertRaisesRegex(ValueError,'seluruh bulan'): self.calc()
+        with self.assertRaisesRegex(ValueError,'maksimum 31 hari'): self.calc()
+        self.slip.end_date=date(2025,12,31)
+        with self.assertRaisesRegex(ValueError,'berurutan'): self.calc()
         self.slip.end_date=date(2026,1,31);self.slip.currency='USD'
         with self.assertRaisesRegex(ValueError,'IDR'): self.calc()
     def test_official_annual_example_via_migration(self):
         self.slip.start_date,self.slip.end_date=date(2026,12,1),date(2026,12,31)
+        self.slip.posting_date=date(2026,12,31)
         self.env.profile.update(opening_through_month=11,opening_gross=110000000,opening_tax=2200000,opening_deductions=1100000,ptkp_status='K/0',method='Gross')
         self.env.settings.component_mapping.append(Box(salary_component='Pension',treatment='Annual Deduction'))
         self.slip.templates['deductions']=[row('Pension',100000,0)];s=self.calc()
         self.assertEqual((s.pph21_tax_final,s.pph21_tax_annual,s.pph21_tax_withholding,s.net_pay),(1,2715000,515000,9385000))
     def test_resignation_refund(self):
         self.env.employee.relieving_date=date(2026,2,28)
+        self.slip.posting_date=date(2026,2,28)
         self.slip.start_date,self.slip.end_date=date(2026,2,1),date(2026,2,28)
         self.env.profile.update(opening_through_month=1,opening_gross=10230179,opening_tax=230179,opening_allowance=230179)
         s=self.calc();self.assertEqual((s.pph21_tax_refund,s.pph21_tax_allowance,s.net_pay),(230179,0,10230179))
         self.assertIn(REFUND,[r.salary_component for r in s.earnings])
     def test_missing_history_and_duplicate_month(self):
+        self.slip.posting_date=date(2026,2,28)
         self.slip.start_date,self.slip.end_date=date(2026,2,1),date(2026,2,28)
         with self.assertRaisesRegex(ValueError,'belum lengkap'): self.calc()
-        self.env.history=[Box(name='OTHER',start_date=date(2026,2,1))]
+        self.env.history=[Box(name='OTHER',start_date=date(2026,1,1),end_date=date(2026,1,31),posting_date=date(2026,2,1))]
         with self.assertRaisesRegex(ValueError,'masa yang sama/lebih baru'): self.calc()
     def test_submitted_history_accumulates(self):
         self.env.history=[Box(self.calc())]
+        self.slip.posting_date=date(2026,2,28)
         self.slip.start_date,self.slip.end_date=date(2026,2,1),date(2026,2,28);self.slip.name='FEB'
         data=json.loads(self.calc().pph21_tax_snapshot)
         self.assertEqual(Decimal(data['prior_gross']),10230179);self.assertEqual(Decimal(data['prior_tax']),230179)
@@ -236,5 +240,147 @@ class V15AdapterTest(unittest.TestCase):
         self.env.profile.tax_id = ''
         slip = self.calc()
         self.assertEqual(slip.pph21_tax_withholding, 230179)
+
+    def set_period(self, start, end, paid, name='CUT-OFF'):
+        self.slip.update(start_date=getdate(start), end_date=getdate(end), posting_date=getdate(paid), name=name)
+
+    def test_pup_cutoff_26_to_25_uses_payment_month_and_preserves_prorata(self):
+        self.set_period('2026-08-26', '2026-09-25', '2026-09-25')
+        self.env.profile.update(opening_through_month=8, opening_gross=80000000, opening_tax=1600000)
+        self.slip.total_working_days=31
+        self.slip.payment_days=25
+        s=self.calc()
+        self.assertEqual((s.pph21_tax_year,s.pph21_tax_month,s.pph21_tax_final),(2026,9,0))
+        self.assertEqual(s.pph21_tax_base,round(10000000*25/31,2))
+        self.assertEqual((s.start_date,s.end_date),(date(2026,8,26),date(2026,9,25)))
+        data=json.loads(s.pph21_tax_snapshot)
+        self.assertEqual((data['payment_date'],data['payroll_start_date'],data['payroll_end_date']),
+                         ('2026-09-25','2026-08-26','2026-09-25'))
+        self.assertEqual(data['prior_gross'],'80000000')
+        s.before_submit()
+        self.assertEqual(s.pph21_tax_month,9)
+        self.assertTrue(self.env.locked)
+
+    def test_payment_date_required_and_drives_profile_lookup(self):
+        self.slip.posting_date=None
+        with self.assertRaisesRegex(ValueError,'Posting Date'): self.calc()
+        self.set_period('2025-12-26','2026-01-25','2026-01-25')
+        self.env.employee.date_of_joining=date(2020,1,1)
+        orig=self.env.get_value
+        def checked(dt, filters, field, **kwargs):
+            if dt=='PPh21 Employee Tax Profile': self.assertEqual(filters['tax_year'],2026)
+            return orig(dt,filters,field,**kwargs)
+        self.env.frappe.db.get_value=checked
+        self.assertEqual((self.calc().pph21_tax_year,self.slip.pph21_tax_month,self.slip.pph21_tax_final),(2026,1,0))
+
+    def test_history_uses_stored_payment_month_across_cutoffs(self):
+        self.set_period('2025-12-26','2026-01-25','2026-01-25','JAN')
+        self.env.employee.date_of_joining=date(2020,1,1)
+        self.env.history=[Box(self.calc())]
+        self.set_period('2026-01-26','2026-02-25','2026-02-25','FEB')
+        data=json.loads(self.calc().pph21_tax_snapshot)
+        self.assertEqual(data['prior_slips'],['JAN'])
+        self.assertEqual(data['prior_tax'],'230179.0')
+        self.slip.before_submit()
+        self.assertEqual(json.loads(self.slip.pph21_tax_snapshot)['prior_slips'],['JAN'])
+
+    def test_payment_month_can_differ_from_both_work_period_months(self):
+        self.set_period('2026-08-26','2026-09-25','2026-10-01')
+        self.env.profile.update(opening_through_month=9, opening_gross=90000000, opening_tax=1800000)
+        self.assertEqual(self.calc().pph21_tax_month,10)
+        self.assertEqual(self.slip.pph21_tax_payment_date,date(2026,10,1))
+
+    def test_history_sql_selection_preserves_scope_and_legacy_periods(self):
+        # Execute the selection itself, not a canned list: company/docstatus,
+        # stored tax year, posting year and overlapping dates all matter.
+        self.env.employee.date_of_joining=date(2020,1,1)
+        old=Box(self.calc())
+        old.posting_date=date(2025,12,31)  # legacy stored January 2026 still wins
+        records=[old]
+        for name, changes in [('OTHER-COMPANY',{'company':'Other'}),
+                              ('OTHER-EMPLOYEE',{'employee':'Other'}),
+                              ('CANCELLED',{'docstatus':2})]:
+            clone=Box(old);clone.update(name=name,**changes);records.append(clone)
+        fields=['name','employee','company','docstatus','start_date','end_date','posting_date',
+                'pph21_tax_year','pph21_tax_month','pph21_tax_profile','pph21_tax_gross','pph21_tax_allowance',
+                'pph21_tax_deductions','pph21_tax_withholding','pph21_tax_refund','pph21_tax_final','pph21_tax_snapshot']
+        db=sqlite3.connect(':memory:');self.addCleanup(db.close);db.row_factory=sqlite3.Row
+        db.execute('CREATE TABLE `tabSalary Slip` ('+', '.join(fields)+')')
+        for record in records:
+            record.setdefault('docstatus',1)
+            values=[str(record[f]) if isinstance(record.get(f),date) else record.get(f) for f in fields]
+            db.execute('INSERT INTO `tabSalary Slip` VALUES ('+','.join('?' for f in fields)+')',values)
+        original=self.env.sql
+        def sql(query,params,**kwargs):
+            if 'FROM `tabSalary Slip`' not in query: return original(query,params,**kwargs)
+            params=[str(v) if isinstance(v,date) else v for v in params]
+            return [Box(r) for r in db.execute(query.replace(' FOR UPDATE','').replace('%s','?'),params)]
+        self.env.frappe.db.sql=sql
+        self.set_period('2026-02-01','2026-02-28','2026-02-28','FEB')
+        self.assertEqual(json.loads(self.calc().pph21_tax_snapshot)['prior_slips'],['JAN'])
+        self.slip.before_submit()
+        self.assertEqual(json.loads(self.slip.pph21_tax_snapshot)['prior_slips'],['JAN'])
+
+    def test_duplicate_payment_month_rejected_even_distinct_work_periods(self):
+        self.set_period('2026-01-01','2026-01-15','2026-01-15','FIRST')
+        self.env.history=[Box(self.calc())]
+        self.set_period('2026-01-16','2026-01-31','2026-01-31','SECOND')
+        with self.assertRaisesRegex(ValueError,'masa yang sama/lebih baru'): self.calc()
+
+    def test_overlap_rejected_even_when_payment_year_changes(self):
+        self.set_period('2025-12-01','2025-12-31','2026-01-01')
+        self.env.employee.date_of_joining=date(2020,1,1)
+        self.env.history=[Box(name='OLD',start_date=date(2025,12,1),end_date=date(2025,12,31),
+            posting_date=date(2025,12,31),pph21_tax_profile='OLD-PROFILE',pph21_tax_year=2025,pph21_tax_month=12)]
+        with self.assertRaisesRegex(ValueError,'tumpang tindih'): self.calc()
+
+    def test_cutoff_opening_balances_and_missing_payment_history(self):
+        self.set_period('2026-08-26','2026-09-25','2026-09-25')
+        with self.assertRaisesRegex(ValueError,'belum lengkap'): self.calc()
+        self.env.profile.opening_through_month=9
+        with self.assertRaisesRegex(ValueError,'dicakup saldo awal'): self.calc()
+        self.env.profile.opening_through_month=8
+        self.assertEqual(self.calc().pph21_tax_month,9)
+
+    def test_december_cutoff_reconciles_in_payment_year(self):
+        self.set_period('2026-11-26','2026-12-25','2026-12-25')
+        self.env.profile.update(opening_through_month=11,opening_gross=110000000,opening_tax=2200000,
+                                opening_deductions=1100000,ptkp_status='K/0',method='Gross')
+        self.env.settings.component_mapping.append(Box(salary_component='Pension',treatment='Annual Deduction'))
+        self.slip.templates['deductions']=[row('Pension',100000,0)]
+        s=self.calc()
+        self.assertEqual((s.pph21_tax_month,s.pph21_tax_final,s.pph21_tax_annual,s.pph21_tax_withholding),(12,1,2715000,515000))
+
+    def test_new_joiner_after_cutoff_does_not_require_unpaid_join_month(self):
+        self.env.employee.date_of_joining=date(2026,8,28)
+        self.set_period('2026-08-26','2026-09-25','2026-09-25','SEP')
+        self.env.history=[Box(self.calc())]
+        self.set_period('2026-09-26','2026-10-25','2026-10-25','OCT')
+        data=json.loads(self.calc().pph21_tax_snapshot)
+        self.assertEqual(data['first_payment_month'],9)
+        self.assertEqual(data['prior_slips'],['SEP'])
+
+    def test_legacy_stored_tax_month_not_relabelled_by_posting_date(self):
+        old=Box(self.calc())
+        old.posting_date=date(2026,2,1)
+        self.env.history=[old]
+        self.set_period('2026-02-01','2026-02-28','2026-02-28','FEB')
+        self.assertEqual(json.loads(self.calc().pph21_tax_snapshot)['prior_slips'],['JAN'])
+
+    def test_resignation_cutoff_must_include_last_working_day(self):
+        self.env.employee.relieving_date=date(2026,9,28)
+        self.env.profile.opening_through_month=8
+        self.set_period('2026-09-01','2026-09-25','2026-09-25')
+        with self.assertRaisesRegex(ValueError,'sampai tanggal resign'): self.calc()
+        self.slip.end_date=date(2026,9,28)
+        self.assertEqual(self.calc().pph21_tax_final,1)
+        self.slip.posting_date=date(2026,10,1)
+        with self.assertRaisesRegex(ValueError,'setelah bulan resign'): self.calc()
+
+    def test_unsupported_payment_year_and_payment_before_period(self):
+        self.set_period('2026-12-26','2027-01-25','2027-01-25')
+        with self.assertRaises(ValueError): self.calc()
+        self.set_period('2026-01-01','2026-01-31','2025-12-31')
+        with self.assertRaisesRegex(ValueError,'sebelum Start Date'): self.calc()
 
 if __name__=='__main__': unittest.main()

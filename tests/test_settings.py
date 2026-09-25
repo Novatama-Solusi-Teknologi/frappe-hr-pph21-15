@@ -1,6 +1,7 @@
 """Settings isolation, migration and native HRMS account lookup contracts."""
 import ast
 import copy
+from datetime import date
 from pathlib import Path
 import sys
 import types
@@ -73,6 +74,26 @@ class SettingsTest(unittest.TestCase):
                             component_mapping=[], rounding='Floor IDR')
         s.validate(); s.on_update()
         return s
+    def test_additional_salary_checks_actual_submitted_work_period(self):
+        original_get=self.frappe.db.get_value
+        self.frappe.db.get_value=lambda dt, filters, field, **kw: 1 if dt=='Employee' else original_get(dt,filters,field,**kw)
+        checked=[]
+        def exists(dt, filters):
+            if dt!='Salary Slip': return False
+            checked.append(filters)
+            self.assertEqual(filters['company'],'PUP')
+            self.assertEqual(filters['pph21_tax_profile'],['is','set'])
+            return date(2026,8,26) <= filters['start_date'][1] and date(2026,9,25) >= filters['end_date'][1]
+        self.frappe.db.exists=exists
+        for day in (date(2026,8,26),date(2026,8,30),date(2026,9,25)):
+            with self.assertRaisesRegex(ValueError,'submitted'):
+                self.validation.validate_additional_salary(Doc(salary_component='Bonus',employee='EMP',company='PUP',payroll_date=day))
+        self.validation.validate_additional_salary(Doc(salary_component='Bonus',employee='EMP',company='PUP',payroll_date=date(2026,9,26)))
+        with self.assertRaisesRegex(ValueError,'submitted'):
+            self.validation.validate_additional_salary(Doc(salary_component='Bonus',employee='EMP',company='PUP',is_recurring=1,
+                from_date=date(2026,8,1),to_date=date(2026,8,31)))
+        self.assertEqual(len(checked),5)
+
     def test_two_settings_same_company_get_distinct_components_and_accounts(self):
         a = self.settings(); b = self.settings('PPH21-SET-00002','Expense B','Liability B')
         self.assertEqual(len(STORE),6)

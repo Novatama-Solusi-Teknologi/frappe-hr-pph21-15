@@ -15,6 +15,7 @@ class TestPPh21Installation(FrappeTestCase):
         self.assertTrue(frappe.get_meta('Employee').has_field('pph21_enabled'))
         meta = frappe.get_meta('Salary Slip')
         self.assertTrue(meta.has_field('pph21_tax_snapshot'))
+        self.assertTrue(meta.get_field('pph21_tax_payment_date').read_only)
         self.assertTrue(meta.get_field('pph21_tax_key').unique)
         self.assertTrue(meta.has_field('pph21_allowance_column'))
         self.assertTrue(frappe.get_meta('Bulk PPh21 Employee Tax Profile').is_submittable)

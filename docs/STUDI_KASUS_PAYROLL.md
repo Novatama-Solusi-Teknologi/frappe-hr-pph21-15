@@ -115,7 +115,10 @@ Buat **Salary Structure** Monthly berisi komponen gaji/potongan biasa, kemudian 
 **Salary Structure Assignment** untuk pegawai. Pegawai Gross dan Gross Up boleh memakai
 struktur yang sama jika komposisi gajinya sama; metode berasal dari profil masing-masing.
 
-Gunakan Payroll Period Januari–Desember dan satu slip per pegawai/bulan kalender.
+Gunakan satu slip per pegawai/masa pembayaran. Start/End Date boleh lintas bulan
+(maksimum 31 hari); tahun/masa pajak mengikuti Posting Date sebagai tanggal pembayaran.
+Contoh 26 Agustus–25 September, dibayar 25 September: masa September.
+Lihat [contoh cutoff](UPGRADE_0_5.md).
 Tambahkan penghasilan tidak rutin melalui **Additional Salary** sebelum membuat/menghitung
 ulang slip bulan tersebut. Jalankan **Payroll Entry → Salary Slip**, periksa draft,
 lalu submit setelah nominal sesuai. Riwayat slip harus berurutan.

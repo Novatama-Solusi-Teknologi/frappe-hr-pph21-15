@@ -38,7 +38,7 @@ Submit melalui **Payroll Entry**, bukan hanya tombol Salary Slip. Periksa:
 ## Proteksi dan koreksi
 
 - Pegawai tanpa profile, komponen belum dipetakan, atau DTP harus gagal dengan pesan jelas.
-- Slip kedua dalam satu bulan, periode dua bulan, dan tahun di luar 2024–2026 harus ditolak.
+- Slip kedua dalam satu masa pembayaran, periode lebih dari 31 hari, dan tahun pembayaran di luar 2024–2026 harus ditolak.
 - Submit bulan setelah riwayat berlubang harus ditolak.
 - Submit dua slip masa sama bersamaan: hanya satu boleh berhasil (uji transaksi database nyata).
 - Setelah Februari submitted, cancel Januari harus ditolak. Cancel Februari lalu Januari boleh,
@@ -110,3 +110,24 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
    Edit akun langsung pada komponen yang dipakai juga ditolak. Settings lain tetap dapat diedit.
 9. Uji submit payroll bersamaan dengan edit akun/Settings pada koneksi berbeda;
    tidak boleh ada snapshot dan akun jurnal yang berbeda akibat race.
+
+
+## Cutoff dan masa pembayaran - 0.5.0
+
+- Periode 26 Agustus–25 September 2026, Posting Date 25 September: masa 9/tahun 2026;
+  saldo awal sampai Agustus. Uji hari kerja/pembayaran asli, LWP dan Gross/Gross Up.
+- Periode yang sama, dibayar 1 Oktober: masa 10, harus ada riwayat sampai September.
+- Periode 26 Desember 2025–25 Januari 2026: profil 2026, masa 1, bukan final Desember.
+- Periode 26 November–25 Desember: final Desember. Cocokkan total pembayaran setahun.
+- Tambah bonus Payroll Date 30 Agustus: masuk slip 26 Agustus–25 September; setelah
+  slip submitted penambahan ditolak. Bonus 26 September masuk periode berikutnya.
+- Karyawan join 28 Agustus, periode pertama 26 Agustus–25 September: masa pertama
+  September; Oktober harus membaca riwayat September tanpa meminta slip Agustus.
+- Dua periode kerja berbeda tetapi Posting Date pada bulan sama: submit kedua ditolak.
+- Periode kerja tumpang tindih dengan slip submitted: ditolak walau tahun pembayaran berbeda.
+- Uji bersamaan pada dua tahun profil untuk pegawai sama; penguncian Employee harus
+  mencegah dua slip periode tumpang tindih lolos bersamaan.
+- Slip submitted lama dengan Posting Date berbeda bulan dari masa tersimpan: tidak
+  direlabel otomatis. Tinjau riwayat sebelum menerapkan basis baru pada pegawai tersebut.
+- Resign di luar cutoff namun dalam bulan pembayaran: perlu slip final mencakup hari resign;
+  pembayaran bulan sesudah resign ditolak sebagai di luar cakupan.
