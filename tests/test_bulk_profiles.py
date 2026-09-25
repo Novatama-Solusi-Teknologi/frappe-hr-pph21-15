@@ -69,7 +69,7 @@ class Environment:
         utils.cint = lambda v: int(v or 0)
         utils.getdate = lambda v=None: date.fromisoformat(str(v)[:10]) if v else date(2026,9,23)
         docmod = types.ModuleType('frappe.model.document'); docmod.Document = Doc
-        setup = types.ModuleType('frappe_hr_pph21.setup'); setup.COMPONENTS = {'PPh21 Tunjangan Pajak': None}
+        setup = types.ModuleType('frappe_hr_pph21.setup'); setup.COMPONENTS = {'PPh21 Tunjangan Pajak': None}; setup.NONCASH_OFFSET = 'PPh21 Utang Noncash'
         self.patcher = patch.dict(sys.modules, {'frappe': self.frappe, 'frappe.utils': utils,
             'frappe.model.document': docmod, 'frappe_hr_pph21.setup': setup})
         self.patcher.start()

@@ -31,7 +31,7 @@ Submit melalui **Payroll Entry**, bukan hanya tombol Salary Slip. Periksa:
 
 - Debit beban tunjangan, kredit utang pajak, net payroll payable dan bank payment.
 - Refund mendebit akun utang pajak dan menambah payroll payable.
-- Komponen noncash tidak menambah payroll payable dan tidak mencatat BPJS dua kali.
+- Komponen noncash mendebit beban dan mengkredit utang BPJS, tanpa menambah net payroll payable atau mencatat BPJS dua kali.
 - Tampilan default print slip, currency, pembulatan dan report CSV.
 - Bonus/Additional Salary, prorata LWP, dan deduction riil sesuai struktur PT PUP.
 
@@ -57,9 +57,9 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
   tabel lebar penuh, serta keterbacaan di desktop dan layar sempit.
 - Cari Salary Component dengan nama dan abbreviation; keduanya tampil pada dropdown.
   Mapping lama setelah migrate menampilkan Kode Komponen yang benar.
-- Pilih Company A: hanya akun A sesuai root type, IDR, aktif, non-group tersedia.
-  Ganti Company B: akun lama kosong; pencarian hanya akun B. Coba kirim akun A melalui
-  API pada settings Company B: validasi harus tetap menolak.
+- Settings dan detail mapping tidak memiliki pemilih Account. Save tanpa COA berhasil membuat
+  komponen. Lengkapi Accounts di Salary Component; akun salah Company/jenis atau duplikat
+  harus ditolak pada kalkulasi payroll, dengan nama komponen pada pesan kesalahan.
 - Buat batch 3 karyawan. Company otomatis, custom_ptkp valid terisi; custom_ptkp kosong
   atau tidak dikenali meminta input manual. Ubah default: baris lama tidak tertimpa.
 - Save draft tidak membuat profil. Submit tanpa konfirmasi ditolak. Setelah konfirmasi,
@@ -106,7 +106,7 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
 6. Uji Gross, refund masa terakhir, hitung ulang draft, pembatalan/amendment, dan YTD.
 7. Bulk: Settings eksplisit per baris, kosong mempertahankan profil lama, konfigurasi
    tunggal otomatis untuk profil baru, beberapa pilihan mewajibkan pemilihan. Uji rollback.
-8. Setelah submit, perubahan Settings profil serta akun/pembulatan Settings ditolak.
+8. Setelah submit, perubahan Settings profil serta akun komponen/pembulatan Settings ditolak.
    Edit akun langsung pada komponen yang dipakai juga ditolak. Settings lain tetap dapat diedit.
 9. Uji submit payroll bersamaan dengan edit akun/Settings pada koneksi berbeda;
    tidak boleh ada snapshot dan akun jurnal yang berbeda akibat race.
@@ -131,3 +131,32 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
   direlabel otomatis. Tinjau riwayat sebelum menerapkan basis baru pada pegawai tersebut.
 - Resign di luar cutoff namun dalam bulan pembayaran: perlu slip final mencakup hari resign;
   pembayaran bulan sesudah resign ditolak sebagai di luar cakupan.
+
+
+## Jurnal lengkap — 0.6.0
+
+- Isi Accounts sumber Expense dan pasangan Liability per Company. Tolak akun salah Company,
+  group, nonaktif, non-IDR, atau salah root type. Save Settings dua kali: pasangan tidak duplikat.
+- BPJS perusahaan 480 ribu + potongan pegawai 120 ribu: debit beban perusahaan 480 ribu,
+  kredit utang BPJS total 600 ribu; THP hanya berkurang 120 ribu sebelum pajak.
+- Noncash Non Taxable juga masuk beban/utang, tanpa menambah bruto PPh21.
+- Gross Up: debit beban tunjangan dan kredit utang PPh21. Gross: kredit utang pajak dan
+  utang gaji berkurang. Refund: debit utang PPh21 dan utang gaji bertambah.
+- Prorata + beberapa Additional Salary noncash sumber sama: satu pasangan sebesar total aktual.
+- Mode Employee-wise accounting aktif/nonaktif dan cost center terbagi: debit= kredit;
+  Bank Entry pembayaran gaji harus sama dengan total net Salary Slips, bukan ditambah BPJS.
+- Coba masukkan pasangan otomatis ke struktur/Additional Salary: harus ditolak.
+- Setelah submit, perubahan akun sumber/pasangan serta penghapusan mapping harus ditolak.
+- Cancel/amend melalui Payroll Entry dan Journal Entry harus membalik seluruh baris beban,
+  utang noncash, pajak, payroll payable. Uji replay untuk memastikan tidak ada jurnal ganda.
+- Bila source Salary Component memiliki Only Tax Impact atau pembayaran Flexible Benefit
+  terpisah, harus ditolak dengan petunjuk agar masuk alur jurnal/payment standar.
+
+## Sumber COA tunggal - 0.7.0
+
+- Upgrade Settings lama: Accounts yang sudah terisi tetap sama sebelum/sesudah migrate dan Save.
+- Settings baru tanpa akun dapat disimpan; komponen pajak/pasangan dibuat sekali, COA tetap kosong.
+- Isi Accounts di komponen: allowance Expense, withholding/refund/pasangan Liability. Payroll sukses.
+- Ubah COA komponen yang belum dipakai submitted, Save Settings, hitung ulang: COA baru tetap dipakai.
+- Dua baris Company sama ditolak. Company berbeda tidak saling memengaruhi.
+- Sisa kolom akun Settings versi lama tidak dipakai, bahkan bila berbeda dengan Accounts master.

@@ -15,11 +15,15 @@ COMPONENTS = {
     WITHHOLDING: ("Deduction", "PPH21_TAX", 0),
     REFUND: ("Earning", "PPH21_TAX_REFUND", 0),
 }
+NONCASH_OFFSET = "PPh21 Utang Noncash"
+
 COMPONENT_FIELDS = {ALLOWANCE: 'allowance_component', WITHHOLDING: 'withholding_component',
                     REFUND: 'refund_component'}
 
 
 def component_role(name):
+    if str(name).startswith(NONCASH_OFFSET + " [") and str(name).endswith("]"):
+        return NONCASH_OFFSET
     return next((base for base in COMPONENTS if name == base or
                  (str(name).startswith(base + ' [') and str(name).endswith(']'))), None)
 
@@ -28,7 +32,7 @@ def component_abbreviation(name):
     base = component_role(name)
     if not base:
         frappe.throw('Komponen bukan komponen otomatis PPh21.')
-    abbr = COMPONENTS[base][1]
+    abbr = "PPH21_NC" if base == NONCASH_OFFSET else COMPONENTS[base][1]
     return abbr if name == base else abbr + '_' + sha256(name.encode()).hexdigest()[:12]
 
 
@@ -174,7 +178,7 @@ def create_components(settings=None):
                             salary_component_abbr=abbr, type=kind,
                             is_tax_applicable=taxable, depends_on_payment_days=0,
                             variable_based_on_taxable_salary=0, statistical_component=0,
-                            do_not_include_in_total=0, remove_if_zero_valued=1,
+                            do_not_include_in_total=0, do_not_include_in_accounts=0, remove_if_zero_valued=1,
                             description=f"Dihitung otomatis Frappe HR PPh21 ({RULE_VERSION}); "
                             + (f"Settings: {settings.name} / {settings.settings_name}. " if settings else '')
                             + "Jangan masukkan ke Salary Structure/Additional Salary."
@@ -183,11 +187,12 @@ def create_components(settings=None):
 
 def validate_component(name, for_update=False):
     doc = frappe.get_doc("Salary Component", name, for_update=for_update)
-    kind, _, taxable = COMPONENTS[component_role(name)]
+    noncash = component_role(name) == NONCASH_OFFSET
+    kind, _, taxable = ("Deduction", "PPH21_NC", 0) if noncash else COMPONENTS[component_role(name)]
     abbr = component_abbreviation(name)
     expected = dict(type=kind, salary_component_abbr=abbr, is_tax_applicable=taxable,
                     depends_on_payment_days=0, variable_based_on_taxable_salary=0,
-                    statistical_component=0, do_not_include_in_total=0,
+                    statistical_component=0, do_not_include_in_total=int(noncash),
                     is_flexible_benefit=0, amount_based_on_formula=0,
                     only_tax_impact=0, do_not_include_in_accounts=0, disabled=0)
     for field, value in expected.items():
@@ -199,19 +204,44 @@ def validate_component(name, for_update=False):
     return doc
 
 
-def configure_accounts(settings):
-    for base, name in settings_components(settings).items():
-        component = validate_component(name)
-        account = settings.expense_account if base == ALLOWANCE else settings.tax_payable_account
-        rows = [row for row in component.accounts if row.company == settings.company]
-        if len(rows) > 1:
-            frappe.throw(f"Duplikasi account pada {name} untuk {settings.company}.")
-        if rows:
-            if rows[0].account == account:
-                continue
-            if rows[0].account and component_has_submitted_slips(name, settings.company):
-                frappe.throw(f'Akun {name} telah dipakai slip submitted; buat Settings baru untuk akun lain.')
-            rows[0].account = account
-        else:
-            component.append("accounts", {"company": settings.company, "account": account})
-        component.save(ignore_permissions=True)
+def noncash_component_name(settings_name, source_component):
+    token = sha256(f"{settings_name}|{source_component}".encode()).hexdigest()[:20]
+    return f"{NONCASH_OFFSET} [{token}]"
+
+
+def validate_noncash_account(name, company, root_type, for_update=False):
+    if not name:
+        frappe.throw(f"Lengkapi akun {root_type} untuk Company {company}.")
+    account = frappe.get_doc("Account", name, for_update=for_update)
+    if (account.company != company or account.root_type != root_type or account.is_group
+            or account.get("disabled") or account.account_currency != "IDR"):
+        frappe.throw(f"Akun {name}: harus {root_type}, aktif, non-group, IDR, milik Company {company}.")
+    return name
+
+
+def component_account(component, company, root_type, for_update=False):
+    rows = [row for row in component.accounts if row.company == company]
+    if len(rows) != 1 or not rows[0].account:
+        frappe.throw(f"Salary Component {component.name}: isi tepat satu akun {root_type} pada tabel Accounts untuk {company}.")
+    return validate_noncash_account(rows[0].account, company, root_type, for_update)
+
+
+def configure_noncash_components(settings):
+    """Create one noncash credit component per mapping; never guess a liability account."""
+    for row in settings.component_mapping:
+        if not row.get("noncash_offset_component"):
+            continue
+        name = noncash_component_name(settings.name, row.salary_component)
+        if row.get("noncash_offset_component") != name:
+            frappe.throw("Simpan ulang PPh21 Settings untuk membuat pasangan utang noncash.")
+        if not frappe.db.exists("Salary Component", name):
+            frappe.get_doc(dict(doctype="Salary Component", salary_component=name,
+                salary_component_abbr=component_abbreviation(name), type="Deduction",
+                is_tax_applicable=0, depends_on_payment_days=0, variable_based_on_taxable_salary=0,
+                statistical_component=0, do_not_include_in_total=1, do_not_include_in_accounts=0,
+                remove_if_zero_valued=1,
+                description=f"Pasangan jurnal otomatis {row.salary_component}; Settings {settings.name}. Bukan potongan THP/pengurang pajak."
+            )).insert(ignore_permissions=True)
+        validate_component(name)
+        # Accounts belong exclusively to Salary Component. Saving Settings never
+        # overwrites them, including existing mappings from earlier app versions.

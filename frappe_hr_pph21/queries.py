@@ -35,12 +35,12 @@ def employee_tax_defaults(employee):
 @frappe.validate_and_sanitize_search_inputs
 def salary_component_query(doctype, txt, searchfield, start, page_len, filters=None):
     # Fixed fields and get_list preserve Frappe role/User Permission filtering.
-    from frappe_hr_pph21.setup import COMPONENTS
+    from frappe_hr_pph21.setup import COMPONENTS, NONCASH_OFFSET
 
     rows = frappe.get_list(
         'Salary Component', fields=['name', 'salary_component_abbr', 'type'],
         filters=[['name', 'not in', list(COMPONENTS)], ['disabled', '=', 0]]
-        + [['name', 'not like', base + ' [%'] for base in COMPONENTS],
+        + [['name', 'not like', base + ' [%'] for base in list(COMPONENTS) + [NONCASH_OFFSET]],
         or_filters={'name': ['like', f'%{txt}%'], 'salary_component_abbr': ['like', f'%{txt}%']},
         start=max(0, cint(start)), page_length=min(50, max(1, cint(page_len))), order_by='name asc',
     )

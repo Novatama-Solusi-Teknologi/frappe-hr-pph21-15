@@ -76,3 +76,11 @@ test('dialog still works if HTML custom field is unavailable before migration',(
     h.refresh({doc:{pph21_tax_snapshot:JSON.stringify(fixture('monthly'))},fields_dict:{},set_df_property(){},add_custom_button:(label,fn)=>click=fn});
     click();assert.equal(h.dialogs[0].shown,true);
 });
+
+test('noncash journal shows saved expense and payable mapping without executing markup',()=>{
+    const {ui}=harness(),data=fixture('monthly');
+    data.noncash_accounting=[{component:'BPJS',expense_account:'Beban BPJS',payable_account:'<script>Utang</script>',amount:'480000'}];
+    const html=ui.render(data);
+    assert.match(html,/Jurnal noncash/);assert.match(html,/Beban BPJS/);assert.match(html,/Rp 480\.000/);
+    assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);
+});

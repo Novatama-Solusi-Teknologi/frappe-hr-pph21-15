@@ -62,6 +62,7 @@ class SettingsTest(unittest.TestCase):
     def exists(self, dt, filters):
         if dt == 'Salary Component': return filters in STORE
         if dt == 'Salary Slip': return False
+        if dt == 'PPh21 Component Tax Mapping': return True
         raise AssertionError(dt)
     def sql(self, query, args):
         if 'SELECT ss.name' in query:
@@ -73,6 +74,8 @@ class SettingsTest(unittest.TestCase):
                             expense_account=expense, tax_payable_account=payable,
                             component_mapping=[], rounding='Floor IDR')
         s.validate(); s.on_update()
+        for base, name in self.setup.settings_components(s).items():
+            STORE[name].append('accounts', dict(company='PUP', account=expense if base==self.setup.ALLOWANCE else payable))
         return s
     def test_worksheet_custom_field_hides_json_without_removing_it(self):
         captured={}
@@ -104,6 +107,61 @@ class SettingsTest(unittest.TestCase):
             self.validation.validate_additional_salary(Doc(salary_component='Bonus',employee='EMP',company='PUP',is_recurring=1,
                 from_date=date(2026,8,1),to_date=date(2026,8,31)))
         self.assertEqual(len(checked),5)
+
+    def noncash_settings(self, name='PPH21-SET-00001', treatment='Taxable Noncash'):
+        s=self.settings(name)
+        STORE['BPJS']=Component(name='BPJS',type='Earning',salary_component_abbr='BPJS',
+            do_not_include_in_total=1,do_not_include_in_accounts=1,statistical_component=0,
+            variable_based_on_taxable_salary=0,accounts=[Box(company='PUP',account='Expense BPJS')])
+        s.component_mapping=[Box(salary_component='BPJS',treatment=treatment,noncash_payable_account='Liability BPJS')]
+        s.validate();s.on_update()
+        STORE[s.component_mapping[0].noncash_offset_component].append('accounts',dict(company='PUP',account='Liability BPJS'))
+        return s
+
+    def test_noncash_pair_is_created_once_with_liability_account_and_no_cash_impact(self):
+        s=self.noncash_settings()
+        name=s.component_mapping[0].noncash_offset_component
+        pair=self.setup.validate_component(name)
+        self.assertEqual((pair.type,pair.do_not_include_in_total,pair.do_not_include_in_accounts),('Deduction',1,0))
+        self.assertEqual(pair.accounts[0].account,'Liability BPJS')
+        self.assertEqual(STORE['BPJS'].do_not_include_in_accounts,1)  # master not silently rewritten
+        count=len(STORE);s.on_update();self.assertEqual(len(STORE),count)
+        for validator,doc in [(self.validation.validate_salary_structure,Doc(earnings=[],deductions=[Box(salary_component=name)])),
+                              (self.validation.validate_additional_salary,Doc(salary_component=name))]:
+            with self.assertRaises(ValueError): validator(doc)
+
+    def test_nontaxable_employer_contribution_also_gets_pair(self):
+        s=self.noncash_settings(treatment='Non Taxable')
+        self.assertTrue(s.component_mapping[0].noncash_offset_component)
+        s.component_mapping[0].noncash_payable_account=None
+        s.validate();s.on_update()  # obsolete account field has no effect
+        self.assertEqual(STORE[s.component_mapping[0].noncash_offset_component].accounts[0].account,'Liability BPJS')
+
+    def test_noncash_accounts_validate_root_company_and_posted_mapping_lock(self):
+        s=self.noncash_settings();m=s.component_mapping[0]
+        pair=STORE[m.noncash_offset_component]
+        pair.accounts[0].account='Expense Wrong'
+        with self.assertRaisesRegex(ValueError,'Liability'):
+            self.setup.component_account(pair,'PUP','Liability')
+        pair.accounts[0].account='Wrong Co'
+        get_doc=self.frappe.get_doc
+        self.frappe.get_doc=lambda dt,name=None,**kw: Doc(company='Other',root_type='Liability',is_group=0,account_currency='IDR') if name=='Wrong Co' else get_doc(dt,name,**kw)
+        with self.assertRaisesRegex(ValueError,'Company'):
+            self.setup.component_account(pair,'PUP','Liability')
+        s._old=Doc(copy.deepcopy(s));self.posted.add(pair.name)
+        m.treatment='Non Taxable'
+        with self.assertRaisesRegex(ValueError,'submitted'): s.validate()
+        s.component_mapping=[]
+        with self.assertRaisesRegex(ValueError,'submitted'): s.validate()
+
+    def test_noncash_source_account_changes_are_locked_after_submission(self):
+        self.noncash_settings();source=STORE['BPJS'];source._old=Doc(copy.deepcopy(source))
+        self.posted.add('BPJS');source.accounts[0].account='Expense Changed'
+        with self.assertRaisesRegex(ValueError,'dikunci'): self.validation.validate_generated_component(source)
+
+    def test_each_settings_gets_a_distinct_noncash_pair(self):
+        a=self.noncash_settings();b=self.noncash_settings('PPH21-SET-00002')
+        self.assertNotEqual(a.component_mapping[0].noncash_offset_component,b.component_mapping[0].noncash_offset_component)
 
     def test_two_settings_same_company_get_distinct_components_and_accounts(self):
         a = self.settings(); b = self.settings('PPH21-SET-00002','Expense B','Liability B')
@@ -144,15 +202,18 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(s.allowance_component,original)
         s.company='Other'
         with self.assertRaisesRegex(ValueError,'Company'): s.validate()
-    def test_posted_settings_lock_accounts_and_rounding_but_other_settings_remain_editable(self):
-        a=self.settings(); b=self.settings('PPH21-SET-00002','Expense B','Liability B')
+    def test_settings_never_overwrites_master_accounts_and_rounding_stays_locked(self):
+        a=self.settings();b=self.settings('PPH21-SET-00002','Expense B','Liability B')
         self.posted.add(a.allowance_component)
-        a._old=Doc(copy.deepcopy(a));a.expense_account='Expense Changed'
+        a._old=Doc(copy.deepcopy(a));a.expense_account='Expense Obsolete'
+        a.validate();a.on_update()
+        self.assertEqual(STORE[a.allowance_component].accounts[0].account,'Expense A')
+        a.rounding='Half Up IDR'
         with self.assertRaisesRegex(ValueError,'submitted'): a.validate()
-        a.expense_account=a._old.expense_account;a.rounding='Half Up IDR'
-        with self.assertRaisesRegex(ValueError,'submitted'): a.validate()
-        b._old=Doc(copy.deepcopy(b));b.expense_account='Expense Changed';b.validate();b.on_update()
+        STORE[b.allowance_component].accounts[0].account='Expense Changed'
+        b.validate();b.on_update()
         self.assertEqual(STORE[b.allowance_component].accounts[0].account,'Expense Changed')
+
     def test_posted_component_mapping_cannot_be_changed_manually(self):
         s=self.settings();c=STORE[s.allowance_component];self.posted.add(c.name)
         c._old=Doc(copy.deepcopy(c));c.accounts[0].account='Expense Wrong'
@@ -189,6 +250,31 @@ class SettingsTest(unittest.TestCase):
         s._old=Doc(copy.deepcopy(s));self.posted.add(self.setup.ALLOWANCE)
         s.validate();s.on_update()
         self.assertEqual(len(STORE),3)
+        self.assertEqual(STORE[self.setup.ALLOWANCE].accounts,[])
+        STORE[self.setup.ALLOWANCE].append('accounts',dict(company='PUP',account='Expense Legacy'))
+        s.on_update()
         self.assertEqual(STORE[self.setup.ALLOWANCE].accounts[0].account,'Expense Legacy')
+
+    def test_new_settings_and_noncash_pair_can_save_before_accounts_are_configured(self):
+        s=self.controller(name='NEW',settings_name='New',company='PUP',rounding='Floor IDR',component_mapping=[])
+        s.validate();s.on_update()
+        self.assertEqual(STORE[s.allowance_component].accounts,[])
+        s=self.noncash_settings()
+        pair=STORE[s.component_mapping[0].noncash_offset_component]
+        pair.accounts=[]
+        s.on_update()
+        self.assertEqual(pair.accounts,[])
+        with self.assertRaisesRegex(ValueError,'tepat satu akun'):
+            self.setup.component_account(pair,'PUP','Liability')
+
+    def test_duplicate_company_account_is_rejected_but_multiple_companies_are_allowed(self):
+        s=self.settings();c=STORE[s.allowance_component]
+        c.append('accounts',dict(company='Other',account='Expense Other'))
+        self.assertEqual(self.setup.component_account(c,'PUP','Expense'),'Expense A')
+        c.append('accounts',dict(company='PUP',account='Expense Duplicate'))
+        with self.assertRaisesRegex(ValueError,'tepat satu akun'):
+            self.setup.component_account(c,'PUP','Expense')
+        with self.assertRaisesRegex(ValueError,'satu baris'):
+            self.validation.validate_generated_component(c)
 
 if __name__ == '__main__': unittest.main()

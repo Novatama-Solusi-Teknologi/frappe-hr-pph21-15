@@ -44,10 +44,10 @@ def callout(title,body):
 def step(num,title,body):
  story.append(KeepTogether([p(f'{num}. {title}','h'),p(body)]))
 
-page('PANDUAN PRAKTIS / RILIS 0.5.0','Setting PPh21 payroll<br/>dan studi kasus','ERPNext / Frappe HR v15 - untuk HR, payroll, dan finance PT PUP.')
-callout('Baru: payroll cutoff, pajak menurut pembayaran','Periode kerja boleh lintas bulan. Isi Posting Date dengan tanggal pembayaran: periode 26 Agustus-25 September dibayar 25 September masuk masa September. Contoh dan langkah pemulihan ada di halaman 12.')
+page('PANDUAN PRAKTIS / RILIS 0.7.0','Setting PPh21 payroll<br/>dan studi kasus','ERPNext / Frappe HR v15 - untuk HR, payroll, dan finance PT PUP.')
+callout('Baru: seluruh COA di Salary Component','Beban dan utang noncash dibuat melalui Payroll Entry tanpa mengubah THP. Isi Accounts di Salary Component sumber dan pasangan. Panduan jurnal ada di halaman 13; contoh cutoff tetap di halaman 12.')
 table(['1. Konfigurasi','2. Profil pegawai','3. Hasil payroll'],[
- ['Nama Settings, Company, akun dan mapping komponen.','Pilih Settings dan Fiscal Year. Individual atau bulk.','Periksa pajak, Net Pay, komponen, serta jurnal.']], [166,167,166])
+ ['Nama Settings, Company dan mapping komponen. COA di Salary Component.','Pilih Settings dan Fiscal Year. Individual atau bulk.','Periksa pajak, Net Pay, komponen, serta jurnal.']], [166,167,166])
 heading('Empat skenario utama')
 table(['Komposisi pembayaran','Pajak beban pegawai','Pajak ditunjang perusahaan'],[
  ['Semua penghasilan taxable','Kasus A - Gross','Kasus C - Gross Up'],
@@ -57,10 +57,10 @@ heading('Isi panduan')
 table(['Bagian','Hal.','Bagian','Hal.'],[
  ['Settings dan mapping','02','Membaca gross-up','07'],['Profil individual','03','BPJS, noncash, THR','08'],
  ['Bulk profile','04','Desember dan resign','09'],['Dua kelompok akun','05','Saldo awal dan kontrol','10'],
- ['Empat kasus utama','06','Upgrade dan referensi','11'],['Periode cutoff dan pembayaran','12','', '']], [195,40,224,40],padding=6)
+ ['Empat kasus utama','06','Upgrade dan referensi','11'],['Periode cutoff dan pembayaran','12','Jurnal BPJS dan PPh21','13']], [195,40,224,40],padding=6)
 
 page('01 / SETTINGS DAN MAPPING','Konfigurasi bernama, akun terpisah','Menu: PPh21 Settings > New. Satu Company boleh memiliki beberapa Settings.')
-step(1,'Isi Nama Pengaturan dan Company','Contoh PUP - Kantor. ID dibuat otomatis, misalnya PPH21-SET-00001. Pilih akun Expense untuk beban tunjangan dan Liability untuk utang PPh21. Akun harus aktif, IDR, non-group, dan milik Company tersebut.')
+step(1,'Isi Nama Pengaturan dan Company','Contoh PUP - Kantor. ID dibuat otomatis, misalnya PPH21-SET-00001. Save membuat komponen otomatis. Buka tautan komponen dan isi Accounts: Expense untuk tunjangan, Liability untuk potongan/refund. Satu akun per Company; aktif, IDR, non-group.')
 step(2,'Petakan seluruh komponen slip','Dropdown menampilkan nama, kode abbreviation, dan tipe. Mapping di bawah adalah sumber klasifikasi pajak app; checkbox Is Tax Applicable saja belum cukup.')
 table(['Contoh komponen','Treatment','Dampak'],[
  ['Gaji, tunjangan tunai, THR, bonus','Taxable Cash','Menambah bruto pajak dan tunai.'],
@@ -69,7 +69,7 @@ table(['Contoh komponen','Treatment','Dampak'],[
  ['JHT/JP pegawai yang memenuhi syarat','Annual Deduction','Potongan tunai; pengurang fiskal masa terakhir.'],
  ['BPJS Kesehatan pegawai / kasbon','Ignore','Potongan tunai, bukan pengurang fiskal.']], [185,116,198])
 callout('Komponen otomatis khusus setiap Settings','Save membuat komponen tunjangan, potongan, dan pengembalian dengan akhiran ID Settings. Jangan memasukkannya ke Salary Structure atau Additional Salary. Settings lama mempertahankan komponen tanpa akhiran.')
-add('<b>Taxable Noncash:</b> Earning, Do Not Include in Total = 1, Do Not Include in Accounting Entries = 1, Statistical Component = 0. Pembukuan iuran noncash dilakukan terpisah. JHT/JP perusahaan yang memenuhi pengecualian tidak dipetakan sebagai Taxable Noncash. [2, 4]','small')
+add('<b>Taxable Noncash:</b> Earning, Do Not Include in Total = 1, Do Not Include in Accounting Entries = 0, Statistical Component = 0. Isi akun beban pada komponen sumber dan akun utang pada komponen pasangan otomatis. JHT/JP perusahaan yang memenuhi pengecualian tidak dipetakan sebagai Taxable Noncash. [2, 4]','small')
 
 page('02 / PROFIL INDIVIDUAL','Hubungkan pegawai ke Settings','Menu: PPh21 Employee Tax Profile > New. Satu profil per pegawai dan tahun pajak.')
 step(1,'Pilih Employee dan PPh21 Settings','Company/nama mengikuti Employee. Pilih Settings aktif untuk perusahaan tersebut. Jika hanya satu pilihan aktif yang dapat diakses, pilihan kosong diisi saat Save; jika beberapa, pilih sendiri.')
@@ -106,8 +106,8 @@ table(['Baris pajak dalam jurnal','Debit (Rp)','Kredit (Rp)'],[
  ['Beban PPh21 Kantor','230.179','-'],['Utang PPh21 Kantor','-','230.179'],
  ['Beban PPh21 Produksi','230.179','-'],['Utang PPh21 Produksi','-','230.179']], [299,100,100])
 add('Tabel hanya menampilkan bagian pajak; jurnal payroll penuh juga memuat gaji dan akun payroll payable. Dengan cost center yang sama sekalipun, akun tetap terpisah karena komponen khusus setiap Settings.','small')
-callout('Gross dan pengembalian pajak','Metode Gross tidak memberi tunjangan, tetapi potongan tetap menuju akun utang Settings pegawai. Pengembalian pada masa terakhir memakai akun utang konfigurasi yang sama.')
-add('Setelah slip submitted memakai Settings, akun dan pembulatannya dikunci. Nama tampilan masih dapat diperbarui. Untuk kelompok akun lain, buat Settings baru; jangan mengganti akun komponen yang sudah dipakai.','small')
+callout('Gross dan pengembalian pajak','Metode Gross tidak memberi tunjangan, tetapi potongan tetap menuju Accounts komponen potongan pegawai. Refund memakai Accounts komponen pengembalian; biasanya akun utang PPh21 yang sama.')
+add('Setelah slip submitted memakai Settings, akun komponen dan pembulatannya dikunci. Nama tampilan masih dapat diperbarui. Untuk kelompok akun lain, buat Settings baru; jangan mengganti akun komponen yang sudah dipakai.','small')
 
 page('05 / PERBANDINGAN UTAMA','Empat kasus, satu pandangan','Semua angka dalam rupiah. Label A-D konsisten pada kedua tabel.')
 callout('Asumsi kasus A-D','Pegawai tetap, TK/0 - TER A, fasilitas Normal, masa biasa (bukan Desember/resign), Floor IDR. Tanpa BPJS, kasbon, atau penghasilan lain.')
@@ -180,10 +180,10 @@ step(2,'Periksa jurnal untuk dua Settings','Pada satu Payroll Entry, pastikan be
 callout('Pajak nol tetap perlu riwayat','Gaji Rp5 juta, TK/0, Gross pada masa biasa menghasilkan TER 0%. Tetap gunakan Taxable Cash dan PPh21 Enabled; penghasilan masuk rekonsiliasi tahunan.')
 add('Instalasi/migrate, UI Desk, izin Company, transaksi bersamaan, dan posting jurnal belum diuji pada site PT PUP. Tes lokal tidak menggantikan UAT pada bench lengkap.','small')
 
-page('10 / UPGRADE DAN REFERENSI','Upgrade ke rilis 0.5.0','Menu: HR &gt; PPh 21. Nama teknis app: frappe_hr_pph21.')
+page('10 / UPGRADE DAN REFERENSI','Upgrade ke rilis 0.7.0','Menu: HR &gt; PPh 21. Nama teknis app: frappe_hr_pph21.')
 step(1,'Deploy source dan migrate','Push source ke repository app, deploy ke staging Frappe Cloud, jalankan migrate, lalu reload browser. Workspace lama berganti nama menjadi PPh 21 di bawah HR. Tidak perlu uninstall/reinstall.')
-step(2,'Periksa Settings lama, lalu Save','Nama tampilan menjadi Company - Standar; ID dan komponen lama dipertahankan. Save memastikan mapping pada field Account yang dibaca HRMS v15. Mapping lama berbeda yang sudah digunakan slip submitted tidak ditimpa otomatis.')
-step(3,'Buat konfigurasi baru dan pilih di profil','Tambahkan Settings untuk kelompok akun lain. Profil lama ditautkan otomatis bila tepat satu Settings cocok dengan Company. Jika ambigu, pilih sendiri. Snapshot dan nominal slip lama tidak ditulis ulang.')
+step(2,'Periksa Settings lama, lalu Save','ID dan komponen lama dipertahankan. COA kini hanya dibaca dari Accounts pada Salary Component. Save Settings tidak menyalin nilai akun lama dari Settings atau menimpa akun master.')
+step(3,'Lengkapi Accounts pada Salary Component','Save Settings untuk membuat komponen/pasangan. Buka tautannya dan isi Accounts per Company. Mapping lama pada Salary Component tetap dipakai; Save Settings tidak menimpanya. Slip/jurnal lama tidak ditulis ulang.')
 table(['Didukung','Belum didukung'],[
  ['Pegawai tetap, WP dalam negeri sepanjang tahun, fasilitas Normal. NIK opsional.','DTP, pegawai tidak tetap, PPh26, perubahan kewajiban pajak subjektif.'],
  ['Fiscal Year Januari-Desember 2024-2026; Gross dan gross-up penuh.','Periode fiskal lintas tahun, gross-up sebagian, dua slip/off-cycle per bulan.']], [250,249])
@@ -195,7 +195,7 @@ refs=[
  ('FAQ DJP PMK 66/2023 nomor 7 - reimbursement','https://stats.pajak.go.id/sites/default/files/2023-12/FAQ%20Terkait%20PMK-66%20Tahun%202023.pdf'),
  ('Materi DJP bukti potong A1 - iuran','https://pajak.go.id/sites/default/files/2025-12/Pembuatan%20Bukti%20Pemotongan%20PPh%20Pasal%2021-Tahunan%20A1%20%20%281%29.pdf')]
 for i,(label,url) in enumerate(refs,1): add(f'<link href="{url}" color="#007e87">[{i}] {label}</link>','small')
-add('Panduan source: docs/UPGRADE_0_5.md, UPGRADE_0_4.md, KONFIGURASI.md, BULK_PROFILE.md, STUDI_KASUS_PAYROLL.md, UAT.md, dan VALIDASI.md.','small')
+add('Panduan source: docs/UPGRADE_0_7.md, UPGRADE_0_5.md, KONFIGURASI.md, BULK_PROFILE.md, STUDI_KASUS_PAYROLL.md, UAT.md, dan VALIDASI.md.','small')
 
 
 page('11 / PERIODE CUTOFF','Periode kerja dan masa pajak','Mulai 0.5.0: Start/End Date untuk HRMS; Posting Date untuk masa pembayaran.')
@@ -210,11 +210,32 @@ table(['Periode kerja','Dibayar (Posting Date)','Masa pajak'],[
  ['26 Nov-25 Des 2026','25 Desember 2026','Desember; rekonsiliasi tahunan.'],
  ['26 Des 2025-25 Jan 2026','25 Januari 2026','Januari; profil 2026.']], [166,151,182])
 heading('Mengulang Create Salary Slips yang gagal')
-add('Deploy source 0.5.0, jalankan migrate, lalu reload Desk. Periksa Posting Date, profil dan riwayat/saldo awal. Jika belum ada slip, ulangi Create Salary Slips. Jika ada draft parsial, periksa dan hitung ulang draft melalui alur HRMS agar tidak membuat duplikat.','small')
+add('Deploy source 0.7.0, jalankan migrate, lalu reload Desk. Periksa Posting Date, profil dan riwayat/saldo awal. Jika belum ada slip, ulangi Create Salary Slips. Jika ada draft parsial, periksa dan hitung ulang draft melalui alur HRMS agar tidak membuat duplikat.','small')
 add('Periksa Tanggal Pembayaran (Posting Date), Tahun Pajak dan Masa Pajak pada bagian PPh 21 Salary Slip. Snapshot menyimpan tanggal pembayaran dan periode kerja. Uji nominal serta jurnal pada staging sebelum produksi.','small')
 heading('Batas dan riwayat')
 add('Satu slip per pegawai/Company/masa pembayaran, maksimum 31 hari kalender dalam periode. Slip submitted lama tidak direlabel. Payroll Date bonus harus masuk Start/End Date slip. Resign harus dicakup slip final dan dibayar dalam bulan resign; pembayaran bulan sesudahnya belum didukung. Tahun pembayaran 2027 masih di luar master aturan.','small')
 add('Basis pembayaran dipakai untuk alur PT PUP yang dikonfirmasi. Saat terutang menurut PMK 168/2023 Pasal 21 tetap mengikuti pembayaran atau terutangnya penghasilan, mana lebih dahulu; app tidak mendeteksi tanggal pengakuan utang terpisah. [2]','small')
+
+
+page('12 / JURNAL BPJS DAN PPH21','Seluruhnya masuk jurnal payroll','Noncash tidak menambah pembayaran gaji, tetapi tetap membentuk beban dan utang.')
+table(['Pengaturan','Komponen BPJS perusahaan','Pasangan utang otomatis'],[
+ ['Type','Earning','Deduction'],
+ ['Do Not Include in Total','1 - dicentang','1 - dicentang'],
+ ['Do Not Include in Accounting Entries','0 - tidak dicentang','0 - tidak dicentang'],
+ ['Akun','Expense, dari Accounts komponen','Liability, dari Accounts pasangan'],
+ ['Nominal','Hasil payroll/prorata','Sama dengan total aktual komponen sumber']], [176,165,158],padding=5)
+add('Save PPh21 Settings, buka <b>Pasangan Utang Otomatis</b> di detail mapping. Isi akun Liability pada Accounts pasangan; jangan dimasukkan ke Salary Structure/Additional Salary. Berlaku juga untuk noncash Non Taxable seperti JHT/JP perusahaan yang memenuhi pengecualian.','small')
+heading('Contoh bagian BPJS pada jurnal payroll')
+add('Gaji Rp10 juta, BPJS perusahaan Rp480 ribu, potongan BPJS pegawai Rp120 ribu. Tabel belum memasukkan baris pajak.','small')
+table(['Akun','Debit (Rp)','Kredit (Rp)'],[
+ ['Beban gaji','10.000.000','-'],['Beban BPJS perusahaan','480.000','-'],
+ ['Utang BPJS: perusahaan + pegawai','-','600.000'],['Utang gaji sebelum PPh21','-','9.880.000'],
+ ['Total','10.480.000','10.480.000']], [299,100,100],padding=5)
+heading('PPh21 ditambahkan pada jurnal yang sama')
+add('<b>Gross Up:</b> debit beban tunjangan, kredit utang PPh21. <b>Gross:</b> kredit utang PPh21, mengurangi utang gaji/THP. <b>Refund:</b> debit utang PPh21, menambah utang gaji/THP. Akun dibaca dari Accounts komponen sesuai Company.','small')
+heading('Pembayaran dan upgrade')
+add('Bank Entry gaji hanya membayar net gaji. Setoran BPJS/PPh21 kemudian mendebit utangnya dan mengkredit Bank; beban tidak diakui lagi. App tidak melakukan transfer bank atau penyetoran otomatis.','small')
+add('Deploy 0.7.0, migrate/build assets, reload, Save Settings dan lengkapi Accounts komponen, lalu hitung ulang draft. Slip/jurnal submitted lama tetap utuh; koreksi memakai cancel/amend beserta jurnal terkait. Akun yang sudah dipakai dikunci. Uji jurnal seimbang dan Bank Entry pada staging sebelum produksi.','small')
 
 
 def decorate(canvas,doc):
@@ -222,13 +243,13 @@ def decorate(canvas,doc):
  canvas.drawString(48,807,'PT PUP / PPH 21');canvas.drawRightString(547,807,'PANDUAN PAYROLL / V15')
  canvas.setStrokeColor(TEAL);canvas.line(48,795,547,795)
  canvas.setFont('Helvetica',8);canvas.setFillColor(INK)
- canvas.drawString(48,32,'PPh 21 0.5.0 | 25 September 2026')
- canvas.drawRightString(547,32,f'{doc.page:02d} / 12');canvas.restoreState()
+ canvas.drawString(48,32,'PPh 21 0.7.0 | 25 September 2026')
+ canvas.drawRightString(547,32,f'{doc.page:02d} / 13');canvas.restoreState()
 
 if __name__ == '__main__':
  out=Path(sys.argv[1]) if len(sys.argv)>1 else Path(__file__).resolve().parents[1]/'docs/Panduan_PPh21_Payroll_PT_PUP.pdf'
  out.parent.mkdir(parents=True,exist_ok=True)
  doc=SimpleDocTemplate(str(out),pagesize=A4,leftMargin=48,rightMargin=48,topMargin=65,bottomMargin=53,
-                       title='Panduan PPh21 Payroll PT PUP - v0.5.0',author='PT PUP',pageCompression=1)
+                       title='Panduan PPh21 Payroll PT PUP - v0.7.0',author='PT PUP',pageCompression=1)
  doc.build(story,onFirstPage=decorate,onLaterPages=decorate)
  print(out)

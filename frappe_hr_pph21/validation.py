@@ -30,8 +30,13 @@ def validate_additional_salary(doc, method=None):
 
 
 def validate_generated_component(doc, method=None):
-    if not component_role(doc.name):
+    if not component_role(doc.name) and not frappe.db.exists("PPh21 Component Tax Mapping", {
+        "salary_component": doc.name, "noncash_offset_component": ["is", "set"],
+    }):
         return
+    companies = [r.company for r in doc.accounts]
+    if len(companies) != len(set(companies)):
+        frappe.throw("Salary Component: hanya satu baris Accounts per Company; Payroll Entry membaca satu akun.")
     old = doc.get_doc_before_save()
     if not old:
         return

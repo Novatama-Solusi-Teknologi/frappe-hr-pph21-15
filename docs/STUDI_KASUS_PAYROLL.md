@@ -1,7 +1,7 @@
 # Panduan PPh21 payroll: konfigurasi dan studi kasus
 
-Untuk PT PUP — ERPNext/Frappe HR v15, app **Frappe HR PPh21 0.3.0**.
-Disusun 23 September 2026. Semua contoh angka dihitung menggunakan mesin app.
+Untuk PT PUP — ERPNext/Frappe HR v15, app **Frappe HR PPh21 0.7.0**.
+Diperbarui 25 September 2026. Semua contoh angka dihitung menggunakan mesin app.
 Panduan ini mengasumsikan app sudah terpasang; pengujian transaksi nyata tetap dilakukan
 di staging sebagaimana [UAT](UAT.md). Rilis 0.3.0 menggunakan master Fiscal Year dan NIK/NPWP opsional; rumus pajak tetap sama.
 
@@ -9,7 +9,7 @@ di staging sebagaimana [UAT](UAT.md). Rilis 0.3.0 menggunakan master Fiscal Year
 
 - Form Settings/profil individual memakai 2-3 kolom; tabel tetap lebar penuh.
 - Mapping menampilkan nama dan kode Salary Component Abbreviation; pencarian menerima keduanya.
-- Pilihan akun mengikuti Company, jenis akun, IDR, aktif, dan non-group.
+- COA hanya di Accounts Salary Component; tepat satu akun aktif, IDR, non-group per Company.
 - Gunakan [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md) untuk mengisi banyak karyawan
   dalam satu form: Employee, Fiscal Year, NIK/NPWP opsional, PTKP, metode. Company otomatis; PTKP
   default dari `custom_ptkp` jika tersedia. Save menyimpan draft; Submit menerapkan seluruh batch.
@@ -64,12 +64,14 @@ bukan dihapus dari perhitungan pembayaran payroll.
 Untuk `Taxable Noncash`, gunakan Earning dengan:
 
 - `Do Not Include in Total = 1`.
-- `Do Not Include in Accounting Entries = 1`.
+- `Do Not Include in Accounting Entries = 0`.
 - `Statistical Component = 0`.
 
-Nominal iuran perusahaan tetap dihitung melalui formula payroll perusahaan. Pembukuan biaya
-dan utang BPJS dilakukan terpisah dari baris noncash ini. JHT/JP perusahaan yang memenuhi
-pengecualian tidak dipetakan sebagai `Taxable Noncash`.
+Nominal iuran perusahaan tetap dihitung melalui formula payroll perusahaan. Akun beban
+berasal dari Accounts pada Salary Component; akun utang dari Accounts komponen pasangan otomatis.
+App membentuk pasangan utang otomatis di jurnal payroll tanpa mengubah THP. JHT/JP perusahaan
+yang memenuhi pengecualian memakai Non Taxable, tetap dengan akun utang noncash.
+Lihat [konfigurasi jurnal 0.7.0](UPGRADE_0_7.md).
 
 Rujukan perlakuan iuran: [materi DJP pengisian bukti potong A1](https://pajak.go.id/sites/default/files/2025-12/Pembuatan%20Bukti%20Pemotongan%20PPh%20Pasal%2021-Tahunan%20A1%20%20%281%29.pdf).
 
@@ -77,8 +79,8 @@ Rujukan perlakuan iuran: [materi DJP pengisian bukti potong A1](https://pajak.go
 
 1. Masuk sebagai **HR Manager** atau **System Manager**. Cari `PPh21 Settings` melalui pencarian Desk.
 2. Buat pengaturan untuk Company PT PUP, lalu aktifkan pengaturannya.
-3. Pilih akun **Beban Tunjangan PPh 21**: akun Expense aktif, bukan group, IDR, milik PT PUP.
-4. Pilih akun **Utang PPh 21 / Pengembalian**: akun Liability dengan ketentuan yang sama.
+3. Settings tidak memiliki pilihan COA. Setelah Save, buka komponen tunjangan otomatis dan isi Accounts dengan akun Expense.
+4. Buka komponen potongan/refund serta pasangan BPJS, isi Accounts dengan akun Liability. Akun harus aktif, IDR, non-group dan Company sesuai.
 5. Pilih pembulatan **Floor IDR** untuk mereplikasi contoh panduan ini. Cocokkan dengan
    hasil pelaporan sebelum produksi; pembulatan dikunci setelah ada slip submitted.
 6. Isi **Pemetaan Komponen** sesuai tabel, kemudian Save.
@@ -325,5 +327,5 @@ pilihan di profil. Pada Payroll Entry yang sama, periksa debit tunjangan kantor 
 debit tunjangan produksi Rp230.179, serta kredit ke masing-masing utang PPh21 Rp230.179.
 Contoh mengasumsikan tidak ada penghasilan/potongan lain dan belum masa rekonsiliasi.
 
-Jika metode Gross, tidak ada baris tunjangan; potongan tetap menuju akun utang Settings
-pegawai tersebut. Pengembalian pada masa terakhir juga memakai akun utang Settings itu.
+Jika metode Gross, tidak ada baris tunjangan; potongan tetap menuju Accounts komponen potongan
+pegawai tersebut. Pengembalian pada masa terakhir juga memakai Accounts komponen pengembalian.

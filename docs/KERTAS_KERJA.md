@@ -38,5 +38,13 @@ lama disembunyikan. Pastikan build assets/deploy Frappe Cloud selesai, lalu hard
 agar script Salary Slip terbaru dimuat. Tidak perlu uninstall app atau menghitung ulang slip
 submitted lama hanya untuk melihat tampilan baru. Perhitungan pajak dan nominal tidak berubah.
 
-Panduan PDF 0.5.0 tetap berlaku untuk konfigurasi payroll; dokumen ini melengkapi perubahan UI.
+Panduan PDF 0.7.0 tetap berlaku untuk konfigurasi payroll; dokumen ini melengkapi perubahan UI.
 Uji pada staging: buka slip masa biasa, Desember/resign, refund, serta slip lama sebelum produksi.
+
+
+Mulai 0.6.0, bagian **Jurnal noncash / BPJS dalam payroll** menunjukkan komponen sumber,
+akun debit beban, akun kredit utang, dan nominal pasangan otomatis dari snapshot.
+Bagian ini hanya muncul bila snapshot mempunyai data noncash accounting; slip lama tidak
+menampilkan jurnal yang belum pernah dibuat. Akun PPh21 tetap ada pada detail tambahan.
+
+Mulai 0.7.0 seluruh akun snapshot bersumber dari Accounts Salary Component, termasuk akun refund tersendiri.

@@ -15,7 +15,7 @@ from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip
 
 from frappe_hr_pph21 import __version__
 from frappe_hr_pph21.settings import selected_settings
-from frappe_hr_pph21.setup import ALLOWANCE, COMPONENTS, REFUND, WITHHOLDING, validate_component, component_role, settings_components
+from frappe_hr_pph21.setup import ALLOWANCE, COMPONENTS, REFUND, WITHHOLDING, validate_component, component_role, settings_components, noncash_component_name, component_account
 from frappe_hr_pph21.tax.engine import dec, final_period, monthly
 from frappe_hr_pph21.tax.rules import RULE_VERSION, check_tax_date, rules_hash
 
@@ -36,10 +36,13 @@ class PPh21SalarySlip(SalarySlip):
         try:
             settings, profile, start, end, employee = self._pph21_context()
             self._pph21_noncash_names = {
-                row.salary_component for row in settings.component_mapping if row.treatment == "Taxable Noncash"
+                row.salary_component for row in settings.component_mapping
+                if row.treatment == "Taxable Noncash" or row.get("noncash_offset_component")
             }
             # Fresh master reads per calculation; submit reloads under row locks.
             self._pph21_noncash_components = {}
+            self._pph21_noncash_postings = {}
+            self._pph21_settings = settings
             # Previous draft output never becomes a new taxable input.
             for table in ("earnings", "deductions"):
                 self.set(table, [row for row in self.get(table) if not component_role(row.salary_component)])
@@ -50,31 +53,66 @@ class PPh21SalarySlip(SalarySlip):
             self._pph21_calculating = False
             self._pph21_noncash_names = set()
             self._pph21_noncash_components = {}
+            self._pph21_noncash_postings = {}
+            self._pph21_settings = None
 
     def get_component_totals(self, component_type, depends_on_payment_days=0):
-        if getattr(self, "_pph21_calculating", False) and component_type == "earnings":
-            # HRMS copies Salary Detail flags from the structure, which can lag
-            # behind the master. Normalize the current slip before native totals
-            # and net pay, so noncash is excluded from both cash and payroll GL.
-            for row in self.get("earnings"):
-                if row.salary_component not in self._pph21_noncash_names:
-                    continue
+        if getattr(self, "_pph21_calculating", False):
+            for row in self.get(component_type):
                 name = row.salary_component
+                if component_role(name):
+                    continue  # Generated rows are validated separately.
                 if name not in self._pph21_noncash_components:
-                    component = frappe.get_doc("Salary Component", name,
-                                              for_update=bool(getattr(self, "_pph21_locked", False)))
-                    if component.type != "Earning" or cint(component.statistical_component):
-                        frappe.throw(f"Salary Component {name}: Taxable Noncash harus Earning dan Statistical Component tidak dicentang.")
-                    missing = [label for field, label in (
-                        ("do_not_include_in_total", "Do Not Include in Total"),
-                        ("do_not_include_in_accounts", "Do Not Include in Accounting Entries"),
-                    ) if not cint(component.get(field))]
-                    if missing:
-                        frappe.throw(f"Salary Component {name}: Noncash harus mengaktifkan {', '.join(missing)} pada master Salary Component, lalu Save. Checkbox pada baris Salary Structure/Slip saja tidak cukup.")
-                    self._pph21_noncash_components[name] = component
-                row.do_not_include_in_total = 1
-                row.do_not_include_in_accounts = 1
+                    self._pph21_noncash_components[name] = frappe.get_doc(
+                        "Salary Component", name, for_update=bool(getattr(self, "_pph21_locked", False)))
+                component = self._pph21_noncash_components[name]
+                if component.get("only_tax_impact") or (component.get("is_flexible_benefit") and
+                        component.get("create_separate_payment_entry_against_benefit_claim")):
+                    frappe.throw(f"{name}: nonaktifkan Only Tax Impact / pembayaran benefit terpisah agar seluruh payroll masuk jurnal dan pembayaran standar.")
+                if name in self._pph21_noncash_names:
+                    if component_type != "earnings" or component.type != "Earning" or component.statistical_component:
+                        frappe.throw(f"Salary Component {name}: noncash harus Earning dan Statistical Component tidak dicentang.")
+                    if not component.do_not_include_in_total:
+                        frappe.throw(f"Salary Component {name}: noncash harus Do Not Include in Total pada master.")
+                    if name not in self._pph21_noncash_postings:
+                        self._pph21_noncash_postings[name] = self._pph21_noncash_posting(component)
+                    row.do_not_include_in_total = 1
+                elif row.do_not_include_in_total or (component_type == "earnings" and component.do_not_include_in_total):
+                    frappe.throw(f"{name}: simpan mapping Settings untuk membuat pasangan Earning noncash. Pasangan potongan noncash dibuat otomatis, jangan ditambahkan manual.")
+                # Accounting eligibility is independent of taxability and cash totals.
+                # Includes existing masters/structures carrying the old exclusion flag.
+                row.do_not_include_in_accounts = 0
         return super().get_component_totals(component_type, depends_on_payment_days=depends_on_payment_days)
+
+    def _pph21_noncash_posting(self, component):
+        settings = self._pph21_settings
+        mapping = next(row for row in settings.component_mapping if row.salary_component == component.name)
+        locked = bool(getattr(self, "_pph21_locked", False))
+        name = noncash_component_name(settings.name, component.name)
+        if mapping.get("noncash_offset_component") != name:
+            frappe.throw(f"{component.name}: simpan PPh21 Settings untuk membuat komponen pasangan noncash.")
+        expense = component_account(component, self.company, "Expense", for_update=locked)
+        offset = validate_component(name, for_update=locked)
+        payable = component_account(offset, self.company, "Liability", for_update=locked)
+        return dict(component=component.name, offset_component=name, abbr=offset.salary_component_abbr,
+                    expense_account=expense, payable_account=payable)
+
+    def _pph21_add_noncash_offsets(self):
+        totals = {}
+        for row in self.earnings:
+            if row.salary_component in self._pph21_noncash_postings:
+                totals[row.salary_component] = totals.get(row.salary_component, dec(0)) + dec(row.amount)
+        ledger = []
+        for source, amount in totals.items():
+            posting = self._pph21_noncash_postings[source]
+            if amount:
+                self.append("deductions", dict(salary_component=posting["offset_component"],
+                    abbr=posting["abbr"], amount=float(amount), default_amount=float(amount),
+                    additional_amount=0, depends_on_payment_days=0, is_tax_applicable=0,
+                    do_not_include_in_total=1, do_not_include_in_accounts=0,
+                    variable_based_on_taxable_salary=0, is_flexible_benefit=0))
+            ledger.append({**posting, "amount": str(amount)})
+        return ledger
 
     def add_tax_components(self):
         if getattr(self, "_pph21_calculating", False):
@@ -142,11 +180,12 @@ class PPh21SalarySlip(SalarySlip):
             frappe.throw("Salary Structure diperlukan untuk payroll PPh21.")
         structure = frappe.get_doc("Salary Structure", self.salary_structure)
         generated_abbrs = [value[1] for value in COMPONENTS.values()]
+        mapped = {r.salary_component: r.treatment for r in self._pph21_settings.component_mapping}
         for table in ("earnings", "deductions"):
             for row in list(structure.get(table)) + list(self.get(table)):
                 if component_role(row.salary_component):
                     frappe.throw("Hapus komponen otomatis PPh21 dari Salary Structure; app menambahkannya sendiri.")
-                if row.salary_component in self._pph21_noncash_names and cint(row.get("statistical_component")):
+                if mapped.get(row.salary_component) not in (None, "Ignore") and cint(row.get("statistical_component")):
                     frappe.throw(f"{row.salary_component}: nonaktifkan Statistical Component pada baris Salary Structure/Slip agar nominal noncash masuk bruto pajak.")
                 if row.variable_based_on_taxable_salary:
                     frappe.throw("Nonaktifkan komponen pajak standar untuk struktur pegawai PPh21.")
@@ -242,9 +281,9 @@ class PPh21SalarySlip(SalarySlip):
                     if treatment == "Taxable Cash" and row.do_not_include_in_total:
                         frappe.throw(f"{row.salary_component}: Taxable Cash harus masuk total earnings.")
                     if treatment == "Taxable Noncash" and not (
-                        row.do_not_include_in_total and row.get("do_not_include_in_accounts")
+                        row.do_not_include_in_total and not row.get("do_not_include_in_accounts")
                     ):
-                        frappe.throw(f"{row.salary_component}: Noncash harus Do Not Include in Total dan Do Not Include in Accounting Entries. Pembukuan BPJS dilakukan terpisah.")
+                        frappe.throw(f"{row.salary_component}: Noncash harus tidak masuk total tunai tetapi tetap masuk jurnal payroll.")
                     base += amount
                 elif treatment == "Annual Deduction":
                     if table != "deductions" or row.do_not_include_in_total:
@@ -255,7 +294,7 @@ class PPh21SalarySlip(SalarySlip):
                                     additional_salary=row.get("additional_salary"),
                                     do_not_include_in_total=cint(row.get("do_not_include_in_total")),
                                     do_not_include_in_accounts=cint(row.get("do_not_include_in_accounts")),
-                                    noncash_flags_source="Salary Component" if treatment == "Taxable Noncash" else None))
+                                    noncash_flags_source="Payroll journal" if row.salary_component in self._pph21_noncash_names else None))
         paid = getdate(self.posting_date)
         prior_gross, prior_deductions, prior_tax, prior_names, first_payment_month = self._pph21_history(profile, paid, employee)
         leave = getdate(employee.relieving_date) if employee.relieving_date else None
@@ -271,14 +310,14 @@ class PPh21SalarySlip(SalarySlip):
         except ValueError as exc:
             frappe.throw(str(exc))
         generated = settings_components(settings)
+        tax_accounts = {}
         for base, amount in ((ALLOWANCE, result.allowance), (WITHHOLDING, result.withholding),
                              (REFUND, result.refund)):
             name = generated[base]
             component = validate_component(name, for_update=bool(getattr(self, '_pph21_locked', False)))
-            expected_account = settings.expense_account if base == ALLOWANCE else settings.tax_payable_account
-            if not any(row.company == self.company and row.account == expected_account
-                       for row in component.accounts):
-                frappe.throw(f"Simpan ulang PPh21 Settings untuk memetakan akun {name}.")
+            tax_accounts[base] = component_account(component, self.company,
+                "Expense" if base == ALLOWANCE else "Liability",
+                for_update=bool(getattr(self, '_pph21_locked', False)))
             table = "deductions" if base == WITHHOLDING else "earnings"
             if amount:
                 self.append(table, dict(salary_component=name, abbr=component.salary_component_abbr,
@@ -287,6 +326,7 @@ class PPh21SalarySlip(SalarySlip):
                                         is_tax_applicable=component.is_tax_applicable,
                                         do_not_include_in_total=0, do_not_include_in_accounts=0,
                                         variable_based_on_taxable_salary=0, is_flexible_benefit=0))
+        noncash_accounting = self._pph21_add_noncash_offsets()
         self.set_precision_for_component_amounts()
         # Already-prorated rows: do not prorate the final amounts a second time.
         self.gross_pay = self.get_component_totals("earnings")
@@ -322,8 +362,9 @@ class PPh21SalarySlip(SalarySlip):
                             "opening_deductions", "opening_tax", "opening_reference")},
                         prior_slips=prior_names, prior_gross=str(prior_gross), prior_tax=str(prior_tax),
                         prior_deductions=str(prior_deductions), components=details,
-                        accounts={"allowance": settings.expense_account, "tax": settings.tax_payable_account},
-                        result=result.as_dict())
+                        accounts={"allowance": tax_accounts[ALLOWANCE], "tax": tax_accounts[WITHHOLDING],
+                                  "refund": tax_accounts[REFUND]},
+                        noncash_accounting=noncash_accounting, result=result.as_dict())
         self.pph21_tax_snapshot = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str, indent=2)
 
     def before_submit(self):

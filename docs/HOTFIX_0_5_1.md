@@ -1,5 +1,8 @@
 # Hotfix 0.5.1 — checkbox Taxable Noncash
 
+> Dokumen historis untuk 0.5.1. Mulai 0.6.0, noncash masuk jurnal payroll dengan pasangan
+> utang otomatis. Gunakan [panduan 0.6.0](UPGRADE_0_6.md), bukan syarat accounting di bawah.
+
 ## Mengapa master sudah dicentang tetapi masih error?
 
 Pada HRMS v15, saat menambahkan komponen dari Salary Structure, method

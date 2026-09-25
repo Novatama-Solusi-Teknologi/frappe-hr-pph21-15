@@ -16,24 +16,10 @@ function harness(slug) {
   return { handlers, locals, pending };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
-test('account queries follow company, type, currency and leaf/active flags', async () => {
-  const {handlers} = harness('pph21_settings');
-  const queries = {};
-  const frm = { doc: {company: 'A',expense_account:'OLD',tax_payable_account:'OLD'},
-    set_query: (f, a, b) => queries[f] = b || a,
-    set_value: async values => Object.assign(frm.doc, values) };
-  handlers['PPh21 Settings'].setup(frm);
-  assert.equal(queries.expense_account().filters.company,'A');
-  assert.equal(queries.expense_account().filters.root_type,'Expense');
-  assert.equal(queries.tax_payable_account().filters.root_type,'Liability');
-  assert.equal(queries.expense_account().filters.account_currency,'IDR');
-  assert.equal(queries.expense_account().filters.is_group,0);
-  assert.equal(queries.expense_account().filters.disabled,0);
-  frm.doc.company='B';
-  await handlers['PPh21 Settings'].company(frm);
-  assert.equal(queries.expense_account().filters.company,'B');
-  assert.equal(frm.doc.expense_account,null);
-  assert.equal(frm.doc.tax_payable_account,null);
+test('Settings configures component lookup without account queries', () => {
+  const {handlers} = harness('pph21_settings'), queries = {};
+  handlers['PPh21 Settings'].setup({set_query:(f,a,b)=>queries[f]=b||a});
+  assert.deepEqual(Object.keys(queries),['salary_component']);
   assert.equal(queries.salary_component().query,'frappe_hr_pph21.queries.salary_component_query');
 });
 test('bulk new rows inherit defaults without overwriting existing rows', async () => {
@@ -113,4 +99,11 @@ test('settings links follow employee company on individual and bulk profiles', a
   bulk.handlers['Bulk PPh21 Employee Tax Profile'].setup({set_query:(field,a,b)=>bq[field]=b||a});
   assert.equal(bq.pph21_settings({},dt,'one').filters.company,'A');
   assert.equal(bq.pph21_settings({},dt,'two').filters.company,'B');
+});
+
+test('Settings and tax mapping have no Account selectors', () => {
+  for (const slug of ['pph21_settings','pph21_component_tax_mapping']) {
+    const meta=JSON.parse(fs.readFileSync(path.join(base,slug,slug+'.json'),'utf8'));
+    assert.equal(meta.fields.some(f=>f.fieldtype==='Link' && f.options==='Account'),false);
+  }
 });

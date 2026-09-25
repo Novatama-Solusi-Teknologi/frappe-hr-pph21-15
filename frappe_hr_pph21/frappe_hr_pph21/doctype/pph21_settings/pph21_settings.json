@@ -10,10 +10,6 @@
     "settings_column",
     "rounding",
     "rule_version",
-    "accounts_section",
-    "expense_account",
-    "accounts_column",
-    "tax_payable_account",
     "components_section",
     "allowance_component",
     "components_column",
@@ -68,29 +64,6 @@
       "default": "PP58-2023_PMK168-2023_v1"
     },
     {
-      "fieldname": "accounts_section",
-      "fieldtype": "Section Break",
-      "label": "Akun Perusahaan"
-    },
-    {
-      "fieldname": "expense_account",
-      "label": "Beban Tunjangan PPh 21",
-      "fieldtype": "Link",
-      "options": "Account",
-      "reqd": 1
-    },
-    {
-      "fieldname": "accounts_column",
-      "fieldtype": "Column Break"
-    },
-    {
-      "fieldname": "tax_payable_account",
-      "label": "Utang PPh 21 / Pengembalian",
-      "fieldtype": "Link",
-      "options": "Account",
-      "reqd": 1
-    },
-    {
       "fieldname": "mapping_section",
       "fieldtype": "Section Break",
       "label": "Pemetaan Komponen"
@@ -113,7 +86,8 @@
       "fieldtype": "Link",
       "options": "Salary Component",
       "read_only": 1,
-      "no_copy": 1
+      "no_copy": 1,
+      "description": "Dibuat saat Save. Buka komponen ini dan isi Accounts untuk Company Settings."
     },
     {
       "fieldname": "withholding_component",
@@ -121,7 +95,8 @@
       "fieldtype": "Link",
       "options": "Salary Component",
       "read_only": 1,
-      "no_copy": 1
+      "no_copy": 1,
+      "description": "Dibuat saat Save. Buka komponen ini dan isi Accounts untuk Company Settings."
     },
     {
       "fieldname": "refund_component",
@@ -129,13 +104,14 @@
       "fieldtype": "Link",
       "options": "Salary Component",
       "read_only": 1,
-      "no_copy": 1
+      "no_copy": 1,
+      "description": "Dibuat saat Save. Buka komponen ini dan isi Accounts untuk Company Settings."
     },
     {
       "fieldname": "components_section",
       "fieldtype": "Section Break",
-      "label": "Komponen Otomatis",
-      "collapsible": 1
+      "label": "Komponen Otomatis - COA di Salary Component",
+      "collapsible": 0
     },
     {
       "fieldname": "components_column",

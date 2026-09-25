@@ -155,3 +155,52 @@ HTML lokal, bukan screenshot dari Desk site PT PUP. Dialog extra-large sesuai so
 
 Panduan baru docs/KERTAS_KERJA.md menjelaskan tampilan, sumber data, dan langkah upgrade.
 PDF konfigurasi 0.5.0 tetap disertakan. Tidak ada commit/push/deploy atau perubahan site produksi.
+
+
+## Rilis 0.6.0 — BPJS dan PPh21 dalam jurnal payroll
+
+Pemeriksaan 25 September 2026: **118 tes Python dan 18 tes JavaScript lulus**.
+Pyflakes dan git diff --check lulus. Tarif serta mesin pajak tidak diubah.
+
+Contract test tambahan menjalankan 11 metode asli Payroll Entry HRMS v15 dari source
+yang sama dengan pengujian 0.4.0, mencakup pembentukan accrual journal dan Bank Entry.
+DB, pemilihan baris slip, Journal Entry persistence, serta layanan Frappe dimock.
+Skenario Gross, Gross Up, kontribusi perusahaan nonobjek, dan refund masa terakhir
+memastikan debit = kredit, Salary Payable dan pembayaran bank = net pay.
+Iuran perusahaan Rp480.000 + potongan pegawai Rp120.000 menghasilkan kredit utang BPJS
+Rp600.000. Skenario juga mencakup pencatatan per Employee dan pembagian cost center 60/40.
+Tunjangan, pemotongan, dan refund PPh21 diperiksa terhadap akun Settings yang dipilih.
+
+Tes lain mencakup pasangan otomatis idempotent, nilai setelah prorata/Additional Salary,
+master lama dengan flag accounting exclusion, noncash nonobjek, akun salah Company/jenis,
+mapping belum lengkap, perubahan akun/mapping setelah submitted, larangan pasangan manual,
+serta filter akun dan escape HTML tabel jurnal kertas kerja.
+
+PDF v0.6.0 sebanyak 13 halaman telah dirender dan diperiksa secara visual. Renderer kertas
+kerja aktual dengan tabel jurnal noncash dijalankan pada Chrome headless lebar 1120 dan
+390 px; tidak ada overflow halaman, tabel lebar dapat digeser pada layar kecil.
+
+Belum dilakukan instalasi/migrate, posting Journal Entry nyata, pembayaran bank, atau
+verifikasi transaksi/cancellation pada bench lengkap atau site PT PUP. Pengujian lokal
+bukan pengganti UAT pada staging. Tidak ada commit/push/deploy. Slip submitted lama tidak
+ditulis ulang. Ikuti UPGRADE_0_6.md dan lengkapi akun utang pada mapping sebelum kalkulasi
+ulang draft payroll.
+
+
+## Rilis 0.7.0 - COA hanya di Salary Component
+
+**121 tes Python dan 18 tes JavaScript lulus** pada 25 September 2026. Tes akun sebelumnya
+disesuaikan untuk membaca Accounts komponen; Settings Save tidak mengisi atau menimpa COA.
+Tes tambahan mencakup Settings/pasangan baru tanpa akun, pemakaian COA master meskipun nilai
+Settings lama berbeda, duplicate Company ditolak, dan multiple Company tetap didukung.
+Schema/UI tidak memiliki Link Account pada Settings maupun child mapping. Refund memiliki
+rekaman akun tersendiri dalam snapshot. Akun submitted tetap dilindungi.
+
+Contract jurnal/Bank Entry asli HRMS v15 tetap lulus untuk BPJS, Gross, Gross Up, refund,
+noncash nonobjek, cost center dan Employee-wise accounting. Pyflakes dan diff check lulus.
+PDF 0.7.0 (13 halaman) dirender dan diperiksa secara visual. Wheel, sdist dan source ZIP
+dibangun untuk rilis ini. Tarif dan rumus pajak tidak berubah.
+
+Belum dilakukan migrate/UI/posting jurnal pada bench lengkap atau Frappe Cloud PT PUP.
+Tidak ada commit, push, deploy, perubahan Accounts master site, atau perubahan slip submitted.
+Lihat UPGRADE_0_7.md untuk langkah update dan UAT.md untuk verifikasi staging.

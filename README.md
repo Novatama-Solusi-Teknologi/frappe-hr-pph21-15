@@ -1,6 +1,6 @@
 # PPh 21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.5.2**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.7.0**, kandidat untuk uji staging.
 
 Nama tampilan: **PPh 21**. Menu default: **HR > PPh 21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -21,6 +21,18 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
 
+## Baru di 0.7.0: COA hanya di Salary Component
+
+PPh21 Settings tidak lagi memiliki pilihan akun. Save membuat komponen pajak dan pasangan
+utang noncash; buka tautannya untuk mengisi **Accounts** pada Salary Component per Company.
+Akun yang sudah tersimpan dipertahankan, tidak disalin ulang atau ditimpa saat Save Settings.
+Untuk satu Company harus tepat satu akun per komponen; beberapa Company tetap didukung.
+
+BPJS/noncash membentuk debit beban sumber dan kredit utang pasangan dalam jurnal Payroll Entry,
+tanpa mengubah THP. Potongan, tunjangan dan refund PPh21 juga membaca Accounts komponennya.
+Seluruh baris moneter masuk jurnal; tidak ada pembukuan beban noncash terpisah.
+Slip/jurnal submitted lama tidak diubah. [Panduan upgrade 0.7.0](docs/UPGRADE_0_7.md).
+
 ## Tampilan kertas kerja 0.5.2
 
 Salary Slip menampilkan ringkasan tunjangan, potongan, dan pengembalian. Tombol **Kertas Kerja
@@ -28,7 +40,7 @@ PPh 21** membuka tabel komponen, perhitungan TER atau rekonsiliasi tahunan, akum
 awal dan akun. Nominal menggunakan format rupiah Indonesia. JSON tetap disimpan sebagai data
 audit, tetapi disembunyikan dari form. [Cara memakai dan upgrade](docs/KERTAS_KERJA.md).
 
-## Hotfix 0.5.1: checkbox komponen noncash
+## Riwayat hotfix 0.5.1: checkbox komponen noncash (digantikan 0.6.0)
 
 Untuk mapping Taxable Noncash, kedua flag pengecualian diambil dari master Salary Component
 sebelum total gaji dihitung, lalu diterapkan pada baris slip yang sedang dihitung. Ini mengatasi
@@ -81,7 +93,7 @@ identitas kosong tidak memblokir payroll Normal. [Panduan upgrade 0.3.0](docs/UP
 
 ## Form dan bulk profile
 
-Form 2-3 kolom, kode komponen pada mapping, filter akun per Company, dan
+Form 2-3 kolom, kode komponen pada mapping, COA pada Salary Component, dan
 [Bulk PPh21 Employee Tax Profile](docs/BULK_PROFILE.md) dengan default PTKP dari Employee.
 Untuk site yang sudah terpasang, ikuti [panduan upgrade](docs/UPGRADE_0_4.md).
 
@@ -121,7 +133,7 @@ App memblokir instalasi bila major version tidak cocok atau ada app lain yang ov
 
 Buka workspace **HR > PPh 21** sebagai **HR Manager** atau **System Manager**:
 
-1. Buat `PPh21 Settings`: nama konfigurasi, perusahaan, akun beban tunjangan, akun utang pajak, dan pemetaan seluruh komponen.
+1. Buat `PPh21 Settings`: nama konfigurasi, perusahaan, dan pemetaan seluruh komponen. Save, lalu isi Accounts pada komponen otomatis PPh21 serta pasangan noncash.
 2. Buat `PPh21 Employee Tax Profile` per pegawai/tahun, pilih Settings dan Fiscal Year, isi PTKP, NIK/NPWP jika tersedia, Gross Up/Gross,
    dan saldo awal bila mulai di tengah tahun.
 3. Aktifkan `PPh21 Enabled` pada Employee serta pengaturan perusahaan.
@@ -131,9 +143,9 @@ Buka workspace **HR > PPh 21** sebagai **HR Manager** atau **System Manager**:
 Detail pemetaan BPJS, contoh setup, jurnal, dan saldo awal ada di [KONFIGURASI.md](docs/KONFIGURASI.md).
 Panduan langkah demi langkah dengan kasus taxable/nonobjek, Gross/Gross Up, BPJS, THR,
 dan masa terakhir ada di [STUDI_KASUS_PAYROLL.md](docs/STUDI_KASUS_PAYROLL.md).
-Versi siap baca/cetak: [Panduan PDF 0.5.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
+Versi siap baca/cetak: [Panduan PDF 0.7.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
 
-## Batas rilis 0.5.0
+## Batas rilis 0.7.0
 
 - Pegawai tetap untuk tujuan PPh 21, WP dalam negeri sepanjang tahun, fasilitas Normal. NIK/NPWP opsional; app tetap memakai tarif Normal.
 - Tahun yang dibundel: **2024–2026**. Tahun lain diblokir sampai master diperbarui.
@@ -142,7 +154,7 @@ Versi siap baca/cetak: [Panduan PDF 0.5.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf
 - Tidak mencakup DTP, PPh 26, pegawai tidak tetap, pesangon final, gross-up sebagian,
   perubahan kewajiban pajak subjektif, rehire dalam tahun yang sama, dan penggabungan pemberi kerja lain.
 - App menghitung pajak dari nominal BPJS yang sudah dihitung payroll. **Bukan kalkulator iuran BPJS**.
-- Noncash objek pajak hanya memengaruhi dasar pajak; pembukuan iurannya dilakukan terpisah.
+- Noncash membentuk debit beban dan kredit utang dalam jurnal payroll; tidak mengubah THP. Wajib melengkapi Accounts pada Salary Component sumber/pasangan.
 - Tidak mengirim data ke DJP, tidak memvalidasi NIK secara online, dan tidak menghasilkan XML Coretax/bukti potong resmi.
 - Metode pembulatan nominal pajak wajib dicocokkan dengan hasil pelaporan yang digunakan PT PUP.
   Pilihan awal `Floor IDR`; tersedia `Half Up IDR`. PKP tetap floor ribuan rupiah.
