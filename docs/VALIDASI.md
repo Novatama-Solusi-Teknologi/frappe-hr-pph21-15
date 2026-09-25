@@ -204,3 +204,16 @@ dibangun untuk rilis ini. Tarif dan rumus pajak tidak berubah.
 Belum dilakukan migrate/UI/posting jurnal pada bench lengkap atau Frappe Cloud PT PUP.
 Tidak ada commit, push, deploy, perubahan Accounts master site, atau perubahan slip submitted.
 Lihat UPGRADE_0_7.md untuk langkah update dan UAT.md untuk verifikasi staging.
+
+
+## Hotfix 0.7.1 - backfill pasangan noncash
+
+125 tes Python lulus, termasuk empat tes baru: backfill mapping kosong/membuat pasangan,
+link ke pasangan yang sudah ada dengan akun tetap utuh, pelestarian link konflik/skip cash,
+dan pemanggilan sinkronisasi pada hook after_migrate setelah migrasi Settings.
+Migrate ulang tidak menduplikasi komponen dan tidak mengubah Accounts. Pengujian masih
+menggunakan DB double, bukan migrate pada site/bench lengkap.
+
+Pyflakes, diff check, build wheel/sdist, dan integritas source ZIP diperiksa. Tidak ada
+perubahan JavaScript, tarif/rumus, PDF atau jurnal submitted. PDF konfigurasi 0.7.0 tetap
+disertakan. Tidak ada commit/push/deploy ke Frappe Cloud dari lingkungan ini.

@@ -90,7 +90,7 @@ class PPh21SalarySlip(SalarySlip):
         locked = bool(getattr(self, "_pph21_locked", False))
         name = noncash_component_name(settings.name, component.name)
         if mapping.get("noncash_offset_component") != name:
-            frappe.throw(f"{component.name}: simpan PPh21 Settings untuk membuat komponen pasangan noncash.")
+            frappe.throw(f"{component.name}: komponen pasangan noncash pada PPh21 Settings {settings.name} belum tersinkron. Simpan ulang Settings atau jalankan migrate app, lalu isi Accounts pada Salary Component pasangan {name} untuk Company {self.company}.")
         expense = component_account(component, self.company, "Expense", for_update=locked)
         offset = validate_component(name, for_update=locked)
         payable = component_account(offset, self.company, "Liability", for_update=locked)

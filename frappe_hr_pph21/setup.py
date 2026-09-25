@@ -90,6 +90,7 @@ def after_migrate():
     backfill_fiscal_year_links()
     from frappe_hr_pph21.settings import migrate_settings_links
     migrate_settings_links()
+    sync_noncash_components()
     from frappe_hr_pph21.workspace import sync_navigation
     sync_navigation()
 
@@ -226,22 +227,59 @@ def component_account(component, company, root_type, for_update=False):
     return validate_noncash_account(rows[0].account, company, root_type, for_update)
 
 
+def create_noncash_component(settings, row):
+    """Create the deterministic pair, preserving existing Accounts and attributes."""
+    name = noncash_component_name(settings.name, row.salary_component)
+    if not frappe.db.exists("Salary Component", name):
+        frappe.get_doc(dict(doctype="Salary Component", salary_component=name,
+            salary_component_abbr=component_abbreviation(name), type="Deduction",
+            is_tax_applicable=0, depends_on_payment_days=0, variable_based_on_taxable_salary=0,
+            statistical_component=0, do_not_include_in_total=1, do_not_include_in_accounts=0,
+            remove_if_zero_valued=1,
+            description=f"Pasangan jurnal otomatis {row.salary_component}; Settings {settings.name}. Bukan potongan THP/pengurang pajak."
+        )).insert(ignore_permissions=True)
+    return name
+
+
 def configure_noncash_components(settings):
-    """Create one noncash credit component per mapping; never guess a liability account."""
     for row in settings.component_mapping:
         if not row.get("noncash_offset_component"):
             continue
         name = noncash_component_name(settings.name, row.salary_component)
-        if row.get("noncash_offset_component") != name:
+        if row.noncash_offset_component != name:
             frappe.throw("Simpan ulang PPh21 Settings untuk membuat pasangan utang noncash.")
-        if not frappe.db.exists("Salary Component", name):
-            frappe.get_doc(dict(doctype="Salary Component", salary_component=name,
-                salary_component_abbr=component_abbreviation(name), type="Deduction",
-                is_tax_applicable=0, depends_on_payment_days=0, variable_based_on_taxable_salary=0,
-                statistical_component=0, do_not_include_in_total=1, do_not_include_in_accounts=0,
-                remove_if_zero_valued=1,
-                description=f"Pasangan jurnal otomatis {row.salary_component}; Settings {settings.name}. Bukan potongan THP/pengurang pajak."
-            )).insert(ignore_permissions=True)
+        create_noncash_component(settings, row)
         validate_component(name)
         # Accounts belong exclusively to Salary Component. Saving Settings never
         # overwrites them, including existing mappings from earlier app versions.
+
+
+def sync_noncash_components():
+    """Backfill legacy links after schema sync, without saving Settings or payroll.
+
+    Existing conflicting links and master configuration are preserved for explicit
+    review. Payroll validation still enforces component flags and complete Accounts.
+    """
+    for record in frappe.get_all("PPh21 Settings", fields=["name"]):
+        settings = frappe.get_doc("PPh21 Settings", record.name)
+        changed = False
+        for row in settings.component_mapping:
+            expected = noncash_component_name(settings.name, row.salary_component)
+            if row.get("noncash_offset_component") not in (None, "", expected):
+                continue
+            if not frappe.db.exists("Salary Component", row.salary_component):
+                continue
+            source = frappe.get_doc("Salary Component", row.salary_component)
+            needs_pair = row.treatment == "Taxable Noncash" or (
+                row.treatment in ("Non Taxable", "Ignore") and source.type == "Earning"
+                and source.do_not_include_in_total and not source.statistical_component
+            )
+            if not needs_pair:
+                continue
+            create_noncash_component(settings, row)
+            if not row.get("noncash_offset_component"):
+                frappe.db.set_value("PPh21 Component Tax Mapping", row.name,
+                    "noncash_offset_component", expected, update_modified=False)
+                changed = True
+        if changed:
+            frappe.clear_document_cache("PPh21 Settings", settings.name)

@@ -293,7 +293,7 @@ class V15AdapterTest(unittest.TestCase):
     def test_missing_noncash_account_and_wrong_pair_cannot_silently_use_salary_payable(self):
         self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
         self.slip.templates['earnings'].append(row('BPJS',480000,0))
-        with self.assertRaisesRegex(ValueError,'komponen pasangan noncash'): self.calc()
+        with self.assertRaisesRegex(ValueError,'komponen pasangan noncash.*PUP Standard'): self.calc()
         self.env.settings.component_mapping[-1]=self.noncash_mapping()
         name=self.env.settings.component_mapping[-1].noncash_offset_component
         self.env.salary_components[name]=Box(name=name,accounts=[])

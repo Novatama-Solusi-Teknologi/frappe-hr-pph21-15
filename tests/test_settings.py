@@ -277,4 +277,69 @@ class SettingsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'satu baris'):
             self.validation.validate_generated_component(c)
 
+    def migration_fixture(self, settings):
+        original=self.frappe.get_doc
+        self.frappe.get_all=lambda dt,**kw: [Box(name=s.name) for s in settings]
+        self.frappe.get_doc=lambda dt,name=None,**kw: next(s for s in settings if s.name==name) if dt=='PPh21 Settings' else original(dt,name,**kw)
+        changes=[]
+        def set_value(dt,name,field,value,**kwargs):
+            self.assertEqual(dt,'PPh21 Component Tax Mapping')
+            self.assertFalse(kwargs['update_modified'])
+            changes.append((name,field,value))
+            for s in settings:
+                for row in s.component_mapping:
+                    if row.name==name: row[field]=value
+        self.frappe.db.set_value=set_value
+        self.frappe.clear_document_cache=lambda *a: None
+        return changes
+
+    def test_upgrade_backfills_missing_noncash_pair_without_saving_settings_or_choosing_account(self):
+        s=self.noncash_settings();row=s.component_mapping[0];row.name='LEGACY-ROW'
+        expected=row.noncash_offset_component
+        del STORE[expected];row.noncash_offset_component=None
+        self.posted.add(s.name)  # existing submitted history must not block metadata backfill
+        changes=self.migration_fixture([s])
+        self.setup.sync_noncash_components()
+        self.assertEqual(row.noncash_offset_component,expected)
+        self.assertEqual(STORE[expected].accounts,[])
+        self.assertEqual(STORE['BPJS'].accounts[0].account,'Expense BPJS')
+        self.assertEqual(changes,[('LEGACY-ROW','noncash_offset_component',expected)])
+        STORE[expected].append('accounts',dict(company='PUP',account='Liability User'))
+        count=len(STORE);self.setup.sync_noncash_components()
+        self.assertEqual(len(STORE),count);self.assertEqual(len(changes),1)
+        self.assertEqual(STORE[expected].accounts[0].account,'Liability User')
+
+    def test_upgrade_reconnects_existing_pair_and_preserves_its_accounts(self):
+        s=self.noncash_settings(treatment='Non Taxable');row=s.component_mapping[0]
+        row.name='NON-TAXABLE';expected=row.noncash_offset_component;row.noncash_offset_component=''
+        self.migration_fixture([s]);self.setup.sync_noncash_components()
+        self.assertEqual(row.noncash_offset_component,expected)
+        self.assertEqual(STORE[expected].accounts[0].account,'Liability BPJS')
+
+    def test_upgrade_skips_cash_and_conflicting_pair_links(self):
+        s=self.noncash_settings();row=s.component_mapping[0];row.name='EXISTING'
+        row.noncash_offset_component='Another pair'
+        STORE['Cash']=Component(name='Cash',type='Earning',do_not_include_in_total=0)
+        s.component_mapping.append(Box(name='CASH',salary_component='Cash',treatment='Taxable Cash'))
+        changes=self.migration_fixture([s]);count=len(STORE)
+        self.setup.sync_noncash_components()
+        self.assertEqual(row.noncash_offset_component,'Another pair')
+        self.assertFalse(changes);self.assertEqual(len(STORE),count)
+
+    def test_after_migrate_runs_backfill_after_settings_migration(self):
+        calls=[]
+        fiscal=types.ModuleType('frappe_hr_pph21.fiscal_year')
+        fiscal.backfill_fiscal_year_links=lambda: calls.append('fiscal')
+        settings=types.ModuleType('frappe_hr_pph21.settings')
+        settings.migrate_settings_links=lambda: calls.append('settings')
+        workspace=types.ModuleType('frappe_hr_pph21.workspace')
+        workspace.sync_navigation=lambda: calls.append('workspace')
+        names=('check_versions','sync_custom_fields','create_components','sync_mapping_codes','sync_noncash_components')
+        with patch.dict(sys.modules, {'frappe_hr_pph21.fiscal_year':fiscal,
+                'frappe_hr_pph21.settings':settings,'frappe_hr_pph21.workspace':workspace}):
+            with patch.multiple(self.setup, **{n:(lambda name=n: calls.append(name)) for n in names}):
+                self.setup.after_migrate()
+        self.assertEqual(calls,['check_versions','sync_custom_fields','create_components','sync_mapping_codes',
+                               'fiscal','settings','sync_noncash_components','workspace'])
+
 if __name__ == '__main__': unittest.main()
