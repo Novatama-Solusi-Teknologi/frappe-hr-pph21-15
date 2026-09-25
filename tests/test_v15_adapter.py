@@ -26,8 +26,8 @@ class Box(dict):
     def __setattr__(self, key, value): self[key] = value
     def set(self, key, value): self[key] = value
     def precision(self, key): return 2
-    def append(self, table, values):
-        row = Box(values)
+    def append(self, table, values=None):
+        row = Box(values or {})
         self.setdefault(table, []).append(row)
         return row
 
@@ -42,11 +42,15 @@ class Environment:
         self.profile.tax_identity_validated = 1
         self.settings = Box(name='PUP Standard', settings_name='PUP Standard', allowance_component=ALLOWANCE, withholding_component=TAX, refund_component=REFUND, enabled=1, company='PT PUP', rounding='Floor IDR', expense_account='Tax Expense', tax_payable_account='Tax Payable', component_mapping=[Box(salary_component='Basic', treatment='Taxable Cash')])
         self.structure, self.history = Box(earnings=[], deductions=[]), []
+        self.salary_components = {
+            'BPJS': Box(type='Earning',statistical_component=0,do_not_include_in_total=1,do_not_include_in_accounts=1),
+            'Basic': Box(type='Earning',statistical_component=0,do_not_include_in_total=0,do_not_include_in_accounts=0),
+        }
         self.locked, self.newer = False, False
         self.frappe = types.ModuleType('frappe')
         self.frappe.db = Box(get_value=self.get_value, exists=lambda *a: self.newer, sql=self.sql)
         self.frappe.throw = fail
-        self.frappe.get_doc = lambda dt, name, **kw: {'Employee':self.employee, 'PPh21 Settings':self.settings, 'PPh21 Employee Tax Profile':self.profile, 'Salary Structure':self.structure}[dt]
+        self.frappe.get_doc = lambda dt, name, **kw: self.salary_components[name] if dt=='Salary Component' else {'Employee':self.employee, 'PPh21 Settings':self.settings, 'PPh21 Employee Tax Profile':self.profile, 'Salary Structure':self.structure}[dt]
         self.frappe.get_all = lambda *a, **k: self.history
         self.utils = types.ModuleType('frappe.utils')
         self.utils.getdate, self.utils.flt, self.utils.cint = getdate, flt, lambda x: int(x or 0)
@@ -89,7 +93,7 @@ class Base(Box):
 def load_controller(env):
     tree = ast.parse(Path(SOURCE).read_text())
     cls = next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='SalarySlip')
-    names = {'calculate_net_pay','set_net_pay','get_component_totals','set_precision_for_component_amounts','get_amount_based_on_payment_days'}
+    names = {'calculate_net_pay','set_net_pay','get_component_totals','set_precision_for_component_amounts','get_amount_based_on_payment_days','update_component_row','update_component_amount_based_on_payment_days'}
     methods = [n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name in names]
     assert len(methods)==len(names)
     ns = dict(frappe=env.frappe,flt=flt,cint=lambda x:int(x or 0),rounded=round,getdate=getdate,set_loan_repayment=lambda self:None,get_period_factor=lambda *a,**k:(1,12))
@@ -165,6 +169,84 @@ class V15AdapterTest(unittest.TestCase):
         r=row('BPJS',400000,0);r.do_not_include_in_total=r.do_not_include_in_accounts=1
         self.slip.templates['earnings'].append(r);s=self.calc()
         self.assertEqual(s.pph21_tax_base,10400000);self.assertEqual(s.net_pay,10000000)
+    def test_noncash_master_flags_override_stale_structure_flags_before_native_totals(self):
+        self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
+        # Actual HRMS v15 row creation copies these stale flags from the structure.
+        stale=row('BPJS',480000,0)
+        self.slip.update_component_row(stale,480000,'earnings')
+        self.assertEqual(self.slip.earnings[0].do_not_include_in_accounts,0)
+        self.slip.templates['earnings'].append(Box(self.slip.earnings[0]))
+        s=self.calc()
+        self.assertEqual(s.pph21_tax_base,10480000)
+        self.assertEqual(s.net_pay,10000000)
+        noncash=next(r for r in s.earnings if r.salary_component=='BPJS')
+        self.assertEqual((noncash.do_not_include_in_total,noncash.do_not_include_in_accounts),(1,1))
+        self.assertEqual(s.gross_pay,10000000+s.pph21_tax_allowance)
+        self.assertEqual(stale.do_not_include_in_total,0)  # no write to the structure/master
+        snapshot=s.pph21_tax_snapshot
+        self.calc();self.assertEqual(s.pph21_tax_snapshot,snapshot)
+        s.before_submit();self.assertEqual(s.net_pay,10000000)
+
+    def test_noncash_excluded_from_first_native_total_and_master_locked_on_submit(self):
+        self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
+        self.slip.templates['earnings'].append(row('BPJS',480000,0))
+        parent=type(self.slip).__bases__[0]
+        native_totals=parent.get_component_totals
+        totals=[]
+        reads=[]
+        get_doc=self.env.frappe.get_doc
+        def recorded_get_doc(dt,name,**kwargs):
+            if dt=='Salary Component': reads.append(kwargs.get('for_update'))
+            return get_doc(dt,name,**kwargs)
+        def recorded_total(doc,component_type,depends_on_payment_days=0):
+            total=native_totals(doc,component_type,depends_on_payment_days)
+            if component_type=='earnings': totals.append(total)
+            return total
+        self.env.frappe.get_doc=recorded_get_doc
+        with patch.object(parent,'get_component_totals',recorded_total):
+            self.calc()
+            self.assertEqual(totals[0],10000000)
+            self.assertEqual(reads,[False])
+            self.slip.before_submit()
+            self.assertEqual(reads,[False,True])
+
+    def test_noncash_statistical_structure_row_is_rejected_before_it_disappears(self):
+        self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
+        r=row('BPJS',480000,0);r.statistical_component=1
+        self.env.structure.earnings=[r]
+        with self.assertRaisesRegex(ValueError,'Statistical Component pada baris Salary Structure'): self.calc()
+
+    def test_noncash_master_must_be_correct_even_if_slip_flags_are_checked(self):
+        self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
+        r=row('BPJS',480000,0);r.do_not_include_in_total=r.do_not_include_in_accounts=1
+        self.slip.templates['earnings'].append(r)
+        for field in ('do_not_include_in_total','do_not_include_in_accounts'):
+            with self.subTest(field=field):
+                self.env.salary_components['BPJS'][field]=0
+                with self.assertRaisesRegex(ValueError,'Salary Component BPJS'): self.calc()
+                self.env.salary_components['BPJS'][field]=1
+
+    def test_noncash_master_is_reread_on_submit(self):
+        self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
+        r=row('BPJS',480000,0);r.do_not_include_in_total=r.do_not_include_in_accounts=1
+        self.slip.templates['earnings'].append(r)
+        self.calc()
+        self.env.salary_components['BPJS'].do_not_include_in_accounts=0
+        with self.assertRaisesRegex(ValueError,'Salary Component BPJS'): self.slip.before_submit()
+
+    def test_noncash_additional_salary_and_gross_method_keep_noncash_out_of_net(self):
+        self.env.profile.method='Gross'
+        self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
+        r=row('BPJS',480000,0);r.additional_salary='ADDITIONAL-TEST'
+        self.slip.templates['earnings'].append(r)
+        s=self.calc()
+        self.assertEqual(s.gross_pay,10000000)
+        self.assertEqual(s.net_pay,10000000-float(monthly(10480000,'TK/0','Gross').withholding))
+        data=json.loads(s.pph21_tax_snapshot)
+        detail=next(d for d in data['components'] if d['component']=='BPJS')
+        self.assertEqual(detail['additional_salary'],'ADDITIONAL-TEST')
+        self.assertEqual(detail['do_not_include_in_accounts'],1)
+
     def test_unmapped_component_rejected(self):
         self.env.settings.component_mapping=[]
         with self.assertRaisesRegex(ValueError,'Petakan'): self.calc()

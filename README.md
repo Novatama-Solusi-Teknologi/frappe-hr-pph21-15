@@ -1,6 +1,6 @@
 # PPh 21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.5.0**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.5.1**, kandidat untuk uji staging.
 
 Nama tampilan: **PPh 21**. Menu default: **HR > PPh 21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -20,6 +20,15 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Snapshot kertas kerja pada setiap slip; register dapat diekspor melalui fitur report Frappe.
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
+
+## Hotfix 0.5.1: checkbox komponen noncash
+
+Untuk mapping Taxable Noncash, kedua flag pengecualian diambil dari master Salary Component
+sebelum total gaji dihitung, lalu diterapkan pada baris slip yang sedang dihitung. Ini mengatasi
+baris Salary Structure/draft yang masih menyimpan nilai lama walaupun master sudah dicentang.
+Master tetap harus mengaktifkan Do Not Include in Total dan Do Not Include in Accounting Entries;
+Statistical Component harus tidak dicentang. Tidak menulis ulang struktur atau slip submitted.
+Lihat [penanganan error noncash](docs/HOTFIX_0_5_1.md).
 
 ## Baru di 0.5.0: payroll cutoff dan masa pembayaran
 

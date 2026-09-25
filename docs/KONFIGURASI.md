@@ -197,3 +197,11 @@ mengubah snapshot submitted, saldo awal atau payroll yang telah diposting.
 
 Pemetaan dan akun perusahaan dapat memengaruhi slip draft berikutnya. Hindari mengubah
 account Salary Component saat Payroll Entry belum selesai diposting; selesaikan jurnal dahulu.
+
+
+## Checkbox noncash setelah perubahan Salary Component
+
+Mulai 0.5.1, app menyelaraskan kedua flag pengecualian dari master Salary Component yang
+sudah disimpan ke baris slip Taxable Noncash sebelum menghitung total gaji. Ini menangani
+flag lama pada Salary Structure/draft. Statistical Component harus tetap tidak dicentang,
+termasuk pada baris struktur. [Langkah penanganan error](HOTFIX_0_5_1.md).

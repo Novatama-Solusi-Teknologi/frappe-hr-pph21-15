@@ -116,3 +116,25 @@ PDF 12 halaman dirender dan diperiksa, termasuk tabel cutoff baru di halaman 12.
 
 Tidak dilakukan migrasi, pembuatan slip, posting jurnal, commit/push atau deploy ke site PT PUP.
 Gunakan UAT.md dan UPGRADE_0_5.md untuk verifikasi pada staging.
+
+
+## Hotfix 0.5.1 — flag noncash pada baris slip
+
+Kondisi master kedua checkbox = 1 tetapi baris Salary Structure/Slip = 0 direproduksi
+menggunakan metode asli HRMS v15 `update_component_row`. Sebelum perubahan, tes gagal
+dengan pesan Noncash yang sama seperti log pengguna. Setelah perubahan, nominal noncash
+masuk bruto pajak, dikeluarkan dari total tunai pertama HRMS, dan kedua flag pengecualian
+tersimpan = 1 pada baris slip untuk dipakai Payroll Entry.
+
+**105 tes Python dan 8 tes JavaScript lulus**, termasuk enam tes tambahan:
+master benar/baris lama, pengecualian sejak total awal dan read lock saat submit,
+penolakan Statistical Component pada baris struktur, master salah/baris terlihat benar,
+perubahan master sebelum submit, dan Additional Salary noncash pada metode Gross.
+Hitung ulang idempotent dan Gross Up tetap diuji. Contract adapter sekarang memakai tujuh
+metode asli HRMS v15, termasuk dua metode pembentukan/prorata baris tambahan.
+Pyflakes, compile, dan git diff --check lulus.
+
+PDF 0.5.0 tidak diubah; docs/HOTFIX_0_5_1.md menjelaskan perubahan dan langkah pemulihan.
+Tidak ada penulisan ke master/struktur atau slip submitted lama. Tidak ada commit/push/deploy.
+Pengujian lokal masih menggunakan DB double, bukan Create/Submit Salary Slips dan jurnal
+pada site Frappe Cloud PT PUP.
