@@ -5,7 +5,6 @@ from hashlib import sha256
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-from frappe_hr_pph21.tax.rules import RULE_VERSION
 
 ALLOWANCE = "PPh21 Tunjangan Pajak"
 WITHHOLDING = "PPh21 Potongan Pajak"
@@ -38,8 +37,10 @@ def component_abbreviation(name):
 
 def settings_components(settings):
     result = {base: settings.get(field) for base, field in COMPONENT_FIELDS.items()}
-    if any(not name or component_role(name) != base for base, name in result.items()):
-        frappe.throw('Simpan ulang PPh21 Settings untuk membuat komponen payroll konfigurasi ini.')
+    if any(not name for name in result.values()):
+        frappe.throw("Pilih komponen Tunjangan, Potongan, dan Pengembalian PPh21 pada Settings.")
+    if len(set(result.values())) != len(result):
+        frappe.throw("Tunjangan, Potongan, dan Pengembalian PPh21 harus memakai tiga komponen berbeda.")
     return result
 
 
@@ -78,19 +79,16 @@ def check_versions():
 
 def after_install():
     sync_custom_fields()
-    create_components()
 
 
 def after_migrate():
     check_versions()
     sync_custom_fields()
-    create_components()
     sync_mapping_codes()
     from frappe_hr_pph21.fiscal_year import backfill_fiscal_year_links
     backfill_fiscal_year_links()
     from frappe_hr_pph21.settings import migrate_settings_links
     migrate_settings_links()
-    sync_noncash_components()
     from frappe_hr_pph21.workspace import sync_navigation
     sync_navigation()
 
@@ -168,40 +166,40 @@ def sync_custom_fields():
     }, update=True)
 
 
-def create_components(settings=None):
-    names = settings_components(settings) if settings else {name: name for name in COMPONENTS}
-    for base, name in names.items():
-        kind, _, taxable = COMPONENTS[base]
-        abbr = component_abbreviation(name)
-        if frappe.db.exists("Salary Component", name):
-            continue  # Never overwrite the site's accounts or settings during migrate.
-        frappe.get_doc(dict(doctype="Salary Component", salary_component=name,
-                            salary_component_abbr=abbr, type=kind,
-                            is_tax_applicable=taxable, depends_on_payment_days=0,
-                            variable_based_on_taxable_salary=0, statistical_component=0,
-                            do_not_include_in_total=0, do_not_include_in_accounts=0, remove_if_zero_valued=1,
-                            description=f"Dihitung otomatis Frappe HR PPh21 ({RULE_VERSION}); "
-                            + (f"Settings: {settings.name} / {settings.settings_name}. " if settings else '')
-                            + "Jangan masukkan ke Salary Structure/Additional Salary."
-                            )).insert(ignore_permissions=True)
+def tax_component_roles(name):
+    """Identify selected masters by Settings links, independent of their names."""
+    if not name:
+        return set()
+    return {role for role, field in COMPONENT_FIELDS.items()
+            if frappe.db.exists("PPh21 Settings", {field: name})}
 
 
-def validate_component(name, for_update=False):
+def is_tax_component(name):
+    return bool(tax_component_roles(name))
+
+
+def validate_component(name, for_update=False, role=None):
+    """Validate an existing tax master for its selected role; never rewrite it."""
+    role = role or component_role(name)
+    if role not in COMPONENTS:
+        frappe.throw("Tentukan peran komponen pajak pada PPh21 Settings.")
     doc = frappe.get_doc("Salary Component", name, for_update=for_update)
-    noncash = component_role(name) == NONCASH_OFFSET
-    kind, _, taxable = ("Deduction", "PPH21_NC", 0) if noncash else COMPONENTS[component_role(name)]
-    abbr = component_abbreviation(name)
-    expected = dict(type=kind, salary_component_abbr=abbr, is_tax_applicable=taxable,
+    kind, _, taxable = COMPONENTS[role]
+    if tax_component_roles(name) - {role}:
+        frappe.throw(f"{name}: sudah dipakai untuk peran pajak lain pada Settings. Gunakan komponen berbeda.")
+    if is_noncash_offset(name) or frappe.db.exists("PPh21 Component Tax Mapping", {"salary_component": name}):
+        frappe.throw(f"{name}: komponen pajak tidak boleh dipakai sebagai sumber mapping atau pasangan noncash.")
+    expected = dict(type=kind, is_tax_applicable=taxable,
                     depends_on_payment_days=0, variable_based_on_taxable_salary=0,
-                    statistical_component=0, do_not_include_in_total=int(noncash),
+                    statistical_component=0, do_not_include_in_total=0,
                     is_flexible_benefit=0, amount_based_on_formula=0,
                     only_tax_impact=0, do_not_include_in_accounts=0, disabled=0)
     for field, value in expected.items():
         actual = doc.get(field) or (0 if isinstance(value, int) else "")
         if actual != value:
-            frappe.throw(f"Salary Component {name}: {field} harus {value!r} untuk Frappe HR PPh21.")
-    if doc.get("formula") or doc.get("condition"):
-        frappe.throw(f"Hapus formula/condition pada komponen otomatis {name}.")
+            frappe.throw(f"Salary Component {name}: {field} harus {value!r} untuk {role}.")
+    if not doc.salary_component_abbr or doc.get("formula") or doc.get("condition") or doc.get("amount"):
+        frappe.throw(f"Salary Component {name}: isi abbreviation; Amount nol, formula/condition kosong. Nominal pajak dihitung app.")
     return doc
 
 
@@ -227,59 +225,29 @@ def component_account(component, company, root_type, for_update=False):
     return validate_noncash_account(rows[0].account, company, root_type, for_update)
 
 
-def create_noncash_component(settings, row):
-    """Create the deterministic pair, preserving existing Accounts and attributes."""
-    name = noncash_component_name(settings.name, row.salary_component)
-    if not frappe.db.exists("Salary Component", name):
-        frappe.get_doc(dict(doctype="Salary Component", salary_component=name,
-            salary_component_abbr=component_abbreviation(name), type="Deduction",
-            is_tax_applicable=0, depends_on_payment_days=0, variable_based_on_taxable_salary=0,
-            statistical_component=0, do_not_include_in_total=1, do_not_include_in_accounts=0,
-            remove_if_zero_valued=1,
-            description=f"Pasangan jurnal otomatis {row.salary_component}; Settings {settings.name}. Bukan potongan THP/pengurang pajak."
-        )).insert(ignore_permissions=True)
-    return name
+def validate_noncash_component(name, for_update=False):
+    """Validate a user-selected journal counterpart without changing its master."""
+    if not name:
+        frappe.throw("Pilih Komponen Pasangan Noncash pada mapping PPh21 Settings.")
+    role = component_role(name)
+    if (role and role != NONCASH_OFFSET) or is_tax_component(name):
+        frappe.throw("Komponen pajak PPh21 tidak dapat digunakan sebagai pasangan noncash.")
+    doc = frappe.get_doc("Salary Component", name, for_update=for_update)
+    expected = dict(type="Deduction", depends_on_payment_days=0,
+        variable_based_on_taxable_salary=0, statistical_component=0,
+        do_not_include_in_total=1, do_not_include_in_accounts=0,
+        is_tax_applicable=0, is_flexible_benefit=0, only_tax_impact=0,
+        amount_based_on_formula=0, disabled=0)
+    for field, value in expected.items():
+        actual = doc.get(field) or (0 if isinstance(value, int) else "")
+        if actual != value:
+            frappe.throw(f"Salary Component {name}: {field} harus {value!r} untuk pasangan noncash. Gunakan komponen khusus jurnal, bukan potongan tunai pegawai.")
+    if not doc.salary_component_abbr or doc.get("formula") or doc.get("condition") or doc.get("amount"):
+        frappe.throw(f"Salary Component {name}: pasangan noncash memerlukan abbreviation; Amount harus nol, formula/condition kosong. Nominal mengikuti sumber noncash.")
+    return doc
 
 
-def configure_noncash_components(settings):
-    for row in settings.component_mapping:
-        if not row.get("noncash_offset_component"):
-            continue
-        name = noncash_component_name(settings.name, row.salary_component)
-        if row.noncash_offset_component != name:
-            frappe.throw("Simpan ulang PPh21 Settings untuk membuat pasangan utang noncash.")
-        create_noncash_component(settings, row)
-        validate_component(name)
-        # Accounts belong exclusively to Salary Component. Saving Settings never
-        # overwrites them, including existing mappings from earlier app versions.
-
-
-def sync_noncash_components():
-    """Backfill legacy links after schema sync, without saving Settings or payroll.
-
-    Existing conflicting links and master configuration are preserved for explicit
-    review. Payroll validation still enforces component flags and complete Accounts.
-    """
-    for record in frappe.get_all("PPh21 Settings", fields=["name"]):
-        settings = frappe.get_doc("PPh21 Settings", record.name)
-        changed = False
-        for row in settings.component_mapping:
-            expected = noncash_component_name(settings.name, row.salary_component)
-            if row.get("noncash_offset_component") not in (None, "", expected):
-                continue
-            if not frappe.db.exists("Salary Component", row.salary_component):
-                continue
-            source = frappe.get_doc("Salary Component", row.salary_component)
-            needs_pair = row.treatment == "Taxable Noncash" or (
-                row.treatment in ("Non Taxable", "Ignore") and source.type == "Earning"
-                and source.do_not_include_in_total and not source.statistical_component
-            )
-            if not needs_pair:
-                continue
-            create_noncash_component(settings, row)
-            if not row.get("noncash_offset_component"):
-                frappe.db.set_value("PPh21 Component Tax Mapping", row.name,
-                    "noncash_offset_component", expected, update_modified=False)
-                changed = True
-        if changed:
-            frappe.clear_document_cache("PPh21 Settings", settings.name)
+def is_noncash_offset(name):
+    return bool(name and frappe.db.exists("PPh21 Component Tax Mapping", {
+        "noncash_offset_component": name,
+    }))

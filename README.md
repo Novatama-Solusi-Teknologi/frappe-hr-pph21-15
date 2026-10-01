@@ -1,6 +1,6 @@
 # PPh 21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.7.1**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.9.0**, kandidat untuk uji staging.
 
 Nama tampilan: **PPh 21**. Menu default: **HR > PPh 21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -21,24 +21,41 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
 
-## Hotfix 0.7.1: pasangan noncash Settings lama
+## Baru di 0.9.0: seluruh komponen pajak dipilih dari master yang ada
 
-Migrate sekarang membuat/menghubungkan pasangan noncash pada mapping lama yang tautannya
-masih kosong, tanpa perlu Save setiap Settings. Accounts komponen yang sudah ada tidak
-berubah. Komponen baru tetap perlu diisi Accounts langsung pada Salary Component.
-[Diagnosis dan pemulihan error pasangan noncash](docs/HOTFIX_0_7_1.md).
+Settings menyediakan pilihan Tunjangan, Potongan dan Pengembalian PPh21. Pilih tiga master
+berbeda; komponen yang sama dapat dipakai untuk peran yang sama pada banyak Settings.
+Install, Save, dan migrate tidak membuat Salary Component baru. Nama slip mengikuti master
+pilihan, tanpa tambahan ID Settings. COA tetap dari Accounts per Company pada komponen.
+Profil pegawai memilih Settings, sehingga master yang sama melayani payroll berbagai
+Salary Structure tanpa perlu ditambahkan sebagai baris struktur lagi.
 
-## Baru di 0.7.0: COA hanya di Salary Component
+Pilihan lama tetap tersimpan; penggantian diperbolehkan sebelum Settings dipakai slip submitted.
+[Konfigurasi dan upgrade 0.9.0](docs/UPGRADE_0_9.md).
 
-PPh21 Settings tidak lagi memiliki pilihan akun. Save membuat komponen pajak dan pasangan
-utang noncash; buka tautannya untuk mengisi **Accounts** pada Salary Component per Company.
-Akun yang sudah tersimpan dipertahankan, tidak disalin ulang atau ditimpa saat Save Settings.
-Untuk satu Company harus tepat satu akun per komponen; beberapa Company tetap didukung.
+## Baru di 0.8.1: cleansing pasangan otomatis lama
 
-BPJS/noncash membentuk debit beban sumber dan kredit utang pasangan dalam jurnal Payroll Entry,
-tanpa mengubah THP. Potongan, tunjangan dan refund PPh21 juga membaca Accounts komponennya.
-Seluruh baris moneter masuk jurnal; tidak ada pembukuan beban noncash terpisah.
-Slip/jurnal submitted lama tidak diubah. [Panduan upgrade 0.7.0](docs/UPGRADE_0_7.md).
+Saat migrate, patch satu kali menghapus pasangan `PPh21 Utang Noncash [kode]` buatan app
+yang belum dipakai. Link pasangan tersebut pada mapping dikosongkan untuk dipilih ulang
+secara manual. Komponen yang masih direferensikan slip, struktur, Additional Salary,
+formula, atau dokumen lain dipertahankan. Laporan JSON disimpan sebagai File private.
+Komponen manual, komponen pajak, dan master Account tidak dihapus.
+[Langkah update dan hasil cleansing](docs/CLEANSING_0_8_1.md).
+
+## Baru di 0.8.0: pilih komponen pasangan noncash yang sudah ada
+
+Pada detail mapping PPh21 Settings, pilih **Komponen Pasangan Noncash** dari Salary Component.
+Save maupun migrate tidak lagi membuat pasangan noncash baru. Rilis 0.8.0 mempertahankan
+pilihan lama; rilis 0.8.1 menambahkan cleansing terbatas sebagaimana dijelaskan di atas.
+
+Pasangan harus Deduction khusus jurnal: Do Not Include in Total = 1 dan Accounting Entries = 0.
+Nominal pasangan diisi app, bukan formula/Amount master. Potongan tunai BPJS pegawai tidak
+boleh dipakai sebagai pasangan kontribusi perusahaan. Satu pasangan boleh dipakai beberapa
+Settings/sumber; nominal beberapa sumber digabung menjadi satu baris pada slip.
+
+Semua COA tetap dibaca dari Accounts Salary Component per Company; Settings tidak mempunyai
+pilihan Account. Sejak 0.9.0, tiga komponen pajak juga dipilih manual; tidak dibuat per Settings.
+[Konfigurasi dan upgrade 0.8.0](docs/UPGRADE_0_8.md).
 
 ## Tampilan kertas kerja 0.5.2
 
@@ -102,7 +119,7 @@ identitas kosong tidak memblokir payroll Normal. [Panduan upgrade 0.3.0](docs/UP
 
 Form 2-3 kolom, kode komponen pada mapping, COA pada Salary Component, dan
 [Bulk PPh21 Employee Tax Profile](docs/BULK_PROFILE.md) dengan default PTKP dari Employee.
-Untuk site yang sudah terpasang, ikuti [panduan upgrade](docs/UPGRADE_0_4.md).
+Untuk site yang sudah terpasang, ikuti [panduan upgrade](docs/UPGRADE_0_9.md).
 
 ## Memasang ke Frappe Cloud
 
@@ -140,19 +157,19 @@ App memblokir instalasi bila major version tidak cocok atau ada app lain yang ov
 
 Buka workspace **HR > PPh 21** sebagai **HR Manager** atau **System Manager**:
 
-1. Buat `PPh21 Settings`: nama konfigurasi, perusahaan, dan pemetaan seluruh komponen. Save, lalu isi Accounts pada komponen otomatis PPh21 serta pasangan noncash.
+1. Buat `PPh21 Settings`: nama konfigurasi, perusahaan, dan pemetaan seluruh komponen. Pilih komponen pasangan yang sudah ada untuk setiap sumber noncash. Pilih tiga komponen pajak yang sudah ada, lengkapi Accounts-nya per Company, lalu Save.
 2. Buat `PPh21 Employee Tax Profile` per pegawai/tahun, pilih Settings dan Fiscal Year, isi PTKP, NIK/NPWP jika tersedia, Gross Up/Gross,
    dan saldo awal bila mulai di tengah tahun.
 3. Aktifkan `PPh21 Enabled` pada Employee serta pengaturan perusahaan.
 4. Jalankan payroll biasa. App menambahkan komponen pajak ke slip secara otomatis.
 
-**Jangan menambahkan komponen otomatis PPh21 ke Salary Structure atau Additional Salary.**
+**Jangan menambahkan komponen pajak atau pasangan noncash pilihan ke Salary Structure/Additional Salary.**
 Detail pemetaan BPJS, contoh setup, jurnal, dan saldo awal ada di [KONFIGURASI.md](docs/KONFIGURASI.md).
 Panduan langkah demi langkah dengan kasus taxable/nonobjek, Gross/Gross Up, BPJS, THR,
 dan masa terakhir ada di [STUDI_KASUS_PAYROLL.md](docs/STUDI_KASUS_PAYROLL.md).
-Versi siap baca/cetak: [Panduan PDF 0.7.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
+Versi siap baca/cetak: [Panduan PDF 0.9.0](docs/Panduan_PPh21_Payroll_PT_PUP.pdf).
 
-## Batas rilis 0.7.0
+## Batas rilis 0.9.0
 
 - Pegawai tetap untuk tujuan PPh 21, WP dalam negeri sepanjang tahun, fasilitas Normal. NIK/NPWP opsional; app tetap memakai tarif Normal.
 - Tahun yang dibundel: **2024–2026**. Tahun lain diblokir sampai master diperbarui.

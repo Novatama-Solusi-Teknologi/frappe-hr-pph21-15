@@ -1,30 +1,33 @@
-# Konfigurasi PT PUP - rilis 0.7.0
+# Konfigurasi PT PUP - rilis 0.9.0
 
 Form master memakai 2-3 kolom; tabel mapping tetap selebar form.
 Profil massal dapat dibuat melalui [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md).
 
 ## 1. Komponen dan akun
 
-Setiap **PPh21 Settings** baru membuat tiga komponen otomatis khusus konfigurasi itu.
-Nama komponennya memakai akhiran ID Settings, misalnya `[PPH21-SET-00001]`.
-Instalasi juga mempertahankan tiga komponen tanpa akhiran untuk Settings lama:
-
+Pilih tiga Salary Component yang sudah ada pada bagian **Pilihan Komponen PPh21**.
+Nama bebas; satu master dapat dipakai untuk peran yang sama pada banyak Settings dan
+payroll dari berbagai Salary Structure. Install/Save/migrate tidak membuat master baru.
+Contoh peran dan akun:
 
 | Komponen | Tipe | Taxable | Accounts yang diisi di Salary Component |
 |---|---|---|---|
 | PPh21 Tunjangan Pajak | Earning | Ya | Beban Tunjangan PPh 21 |
-| PPh21 Potongan Pajak | Deduction | Tidak relevan | Utang PPh 21 |
+| PPh21 Potongan Pajak | Deduction | Tidak | Utang PPh 21 |
 | PPh21 Pengembalian Pajak | Earning | Tidak | Utang PPh 21 |
 
 Semua tidak bergantung pada payment days, tidak statistical, dan tidak memakai formula.
 Komponen ditambahkan otomatis setelah HRMS menghitung gaji aktual. **Jangan memasukkannya ke
 Salary Structure/Additional Salary.** Pengaturan ini diperiksa kembali pada setiap kalkulasi.
 
-Di PPh21 Settings isi **Nama Pengaturan**, Company dan mapping, lalu Save. Buka tautan
-komponen otomatis dan isi Accounts per Company langsung pada Salary Component. Akun harus
-aktif, IDR, non-group: Expense untuk tunjangan, Liability untuk potongan dan refund.
-Save Settings tidak menimpa Accounts, termasuk akun yang sudah tersimpan dari versi lama.
-Satu Company boleh memiliki beberapa Settings dengan komponen berbeda.
+Di PPh21 Settings isi **Nama Pengaturan**, Company, tiga pilihan komponen pajak dan mapping.
+Lengkapi Accounts per Company langsung pada master sebelum Save: akun aktif, IDR, non-group;
+Expense untuk tunjangan, Liability untuk potongan/refund. Save tidak menimpa Accounts.
+Abbreviation wajib; Amount nol; Formula/Condition kosong; kedua Do Not Include, Depends on
+Payment Days, Statistical, Variable Tax, Flexible Benefit, Only Tax Impact dan Amount Based
+on Formula tidak dicentang. Ketiga master harus berbeda dan aktif.
+Satu Company boleh memiliki beberapa Settings dengan komponen bersama atau berbeda.
+Jika COA berbeda dalam Company sama, gunakan komponen berbeda untuk peran terkait saja.
 Contoh:
 
 | Nama Settings | Company | Beban tunjangan | Utang PPh21 | Profil pegawai |
@@ -75,17 +78,22 @@ Untuk Noncash gunakan Salary Component **Earning** dengan:
 
 HRMS v15 tidak menyimpan Statistical Component sebagai baris Salary Slip; karena itu tidak
 bisa menjadi sumber audit nominal noncash di app ini. Isi akun **Expense** pada Accounts
-Salary Component untuk Company. Save PPh21 Settings membuat pasangan utang otomatis.
-Buka tautan **Pasangan Utang Otomatis** di detail mapping, isi Accounts dengan akun Liability. Beban dan utang masuk jurnal
+Salary Component untuk Company. Pada detail mapping, pilih **Komponen Pasangan Noncash**
+yang sudah ada. Accounts pasangan harus berisi akun Liability. Save/migrate tidak membuat pasangan baru. Beban dan utang masuk jurnal
 payroll yang sama tanpa mengubah THP. Berlaku juga untuk JHT/JP perusahaan yang memenuhi
 pengecualian, dengan mapping Non Taxable dan Do Not Include in Total = 1.
-Jangan memasukkan pasangan utang otomatis ke struktur atau membuat pasangan manual kedua.
+Pasangan harus Deduction, Do Not Include in Total = 1, Accounting Entries = 0; Amount nol,
+formula/condition kosong; Depends on Payment Days/Statistical/Tax Applicable/Flexible Benefit/
+Only Tax Impact tidak dicentang. Abbreviation wajib. Jangan gunakan potongan tunai BPJS pegawai.
+Jangan masukkan pasangan pilihan ke struktur/Additional Salary; app mengisi nominalnya.
+Satu pasangan dapat dipakai beberapa Settings/sumber dengan akun Company sesuai; nominal
+digabung menjadi satu baris per pasangan pada slip. Komponen pajak lama tidak dihapus otomatis; pasangan noncash legacy bebas referensi dibersihkan satu kali oleh patch 0.8.1.
 Pengaturan accounting lama = 1 tetap diselaraskan menjadi 0 pada slip yang dihitung oleh app,
-tanpa menulis ulang master bersama. [Panduan jurnal payroll](UPGRADE_0_7.md).
+tanpa menulis ulang master bersama. [Panduan jurnal payroll](UPGRADE_0_8.md).
 
 Formula BPJS yang ada tetap dikelola Salary Structure. App tidak menentukan batas upah,
 persentase iuran, atau klasifikasi risiko JKK. Jangan membuat formula komponen dasar bergantung
-pada PPH21_TAX_ALLOW/PPH21_TAX atau field pph21_tax_* karena menyebabkan ketergantungan melingkar.
+pada abbreviation komponen pajak pilihan atau field pph21_tax_* karena menyebabkan ketergantungan melingkar.
 
 ## 3. Profil pegawai
 
@@ -209,8 +217,8 @@ account Salary Component saat Payroll Entry belum selesai diposting; selesaikan 
 ## Checkbox noncash setelah perubahan Salary Component
 
 Mulai 0.6.0, noncash tetap tidak masuk total tunai tetapi masuk jurnal. App menyelaraskan
-flag baris dan membuat pasangan utang otomatis. Statistical Component harus tidak dicentang
-pada master maupun baris struktur. [Langkah konfigurasi](UPGRADE_0_7.md).
+flag baris dan mengisi nominal pasangan pilihan. Statistical Component harus tidak dicentang
+pada master maupun baris struktur. [Langkah konfigurasi](UPGRADE_0_8.md).
 
 
 ## Membaca kertas kerja

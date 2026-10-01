@@ -145,7 +145,7 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
 - Prorata + beberapa Additional Salary noncash sumber sama: satu pasangan sebesar total aktual.
 - Mode Employee-wise accounting aktif/nonaktif dan cost center terbagi: debit= kredit;
   Bank Entry pembayaran gaji harus sama dengan total net Salary Slips, bukan ditambah BPJS.
-- Coba masukkan pasangan otomatis ke struktur/Additional Salary: harus ditolak.
+- Coba masukkan pasangan pilihan ke struktur/Additional Salary: harus ditolak.
 - Setelah submit, perubahan akun sumber/pasangan serta penghapusan mapping harus ditolak.
 - Cancel/amend melalui Payroll Entry dan Journal Entry harus membalik seluruh baris beban,
   utang noncash, pajak, payroll payable. Uji replay untuk memastikan tidak ada jurnal ganda.
@@ -155,8 +155,50 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
 ## Sumber COA tunggal - 0.7.0
 
 - Upgrade Settings lama: Accounts yang sudah terisi tetap sama sebelum/sesudah migrate dan Save.
-- Settings baru tanpa akun dapat disimpan; komponen pajak/pasangan dibuat sekali, COA tetap kosong.
+- Settings baru tanpa noncash bisa disimpan untuk membuat komponen pajak. Mapping noncash membutuhkan pilihan pasangan yang sudah ada beserta Accounts.
 - Isi Accounts di komponen: allowance Expense, withholding/refund/pasangan Liability. Payroll sukses.
 - Ubah COA komponen yang belum dipakai submitted, Save Settings, hitung ulang: COA baru tetap dipakai.
 - Dua baris Company sama ditolak. Company berbeda tidak saling memengaruhi.
 - Sisa kolom akun Settings versi lama tidak dipakai, bahkan bila berbeda dengan Accounts master.
+
+## Pasangan pilihan pengguna - 0.8.0
+
+- Save/migrate tidak menambah master pasangan noncash; data/nama/akun pasangan lama tetap utuh.
+- Field Komponen Pasangan Noncash dapat dipilih. Salah type, flag cash/Accounting Entries,
+  disabled, formula, Amount tetap, Company atau akun Liability ditolak.
+- Settings tanpa pilihan pasangan untuk sumber noncash ditolak dengan nama sumber.
+- Pilih pasangan sama untuk dua Settings dan beberapa sumber: satu baris pasangan pada slip,
+  nominal total sumber, jurnal seimbang dan Bank Entry = net pay. Snapshot merinci sumber.
+- Pasangan di Salary Structure/Additional Salary harus ditolak agar tidak dobel.
+- Ubah pilihan pada Settings/draft yang belum submitted: pasangan lama tidak tersisa di slip.
+- Setelah submitted, pilihan pasangan dan akun/atribut master dikunci.
+- Potongan BPJS bagian karyawan tetap memotong THP; tidak bisa dipilih sebagai pasangan perusahaan.
+
+
+## Cleansing pasangan legacy — 0.8.1
+
+- Migrate data uji dengan pasangan otomatis lama tanpa pemakaian: master terhapus, pilihan
+  pasangan pada mapping kosong, sumber dan master Account tetap ada.
+- Migrate dengan pasangan pada Salary Structure/Slip/Additional Salary atau formula:
+  master dan link mapping tetap utuh, alasan tercatat pada laporan private File.
+- Komponen manual, komponen pajak, nama mirip tetapi identitas berbeda tetap utuh.
+- Referensi Link tambahan menolak penghapusan dan mengembalikan link mapping; pasangan
+  lain yang bebas referensi tetap dapat dibersihkan.
+- Migrate ulang tidak mengulang patch atau menciptakan pasangan baru. Pilih pasangan manual,
+  Save Settings, kemudian lanjutkan uji slip dan jurnal sesuai skenario 0.8.0.
+
+
+## Komponen pajak bersama — 0.9.0
+
+- Install/Save/migrate tidak menambah Salary Component. Tiga pilihan pajak editable dan wajib.
+- Dua Settings dan dua Salary Structure memakai tiga master pajak yang sama: nama slip
+  sesuai pilihan, tidak ada suffix/duplikasi, COA dan nilai jurnal/net pay benar.
+- Master tunjangan berbeda untuk akun beban berbeda; potongan/refund tetap dapat dibagi.
+- Salah type/flag/Amount/formula/akun, peran berbeda lintas Settings, dan sumber/pasangan
+  tumpang tindih ditolak. Formula sumber merujuk abbreviation pajak ditolak.
+- Ganti pilihan pada Settings yang belum submitted, hitung ulang draft: hanya nama baru
+  muncul, snapshot memakai pilihan baru, hasil pajak/net pay tidak berubah.
+- Save ulang Settings yang memakai komponen legacy tidak membuat tambahan master.
+- Submitted mengunci pilihan Settings dan akun master; Settings lain yang belum submitted
+  tetap boleh memilih master bersama atau pembulatan sendiri.
+- Uji ulang Gross, Gross Up, final/refund, jurnal payroll serta Bank Entry di site staging.

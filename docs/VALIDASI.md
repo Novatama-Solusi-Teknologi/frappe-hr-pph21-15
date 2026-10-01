@@ -217,3 +217,73 @@ menggunakan DB double, bukan migrate pada site/bench lengkap.
 Pyflakes, diff check, build wheel/sdist, dan integritas source ZIP diperiksa. Tidak ada
 perubahan JavaScript, tarif/rumus, PDF atau jurnal submitted. PDF konfigurasi 0.7.0 tetap
 disertakan. Tidak ada commit/push/deploy ke Frappe Cloud dari lingkungan ini.
+
+
+## Rilis 0.8.0 - pasangan noncash pilihan pengguna
+
+Pemeriksaan 1 Oktober 2026: **132 tes Python dan 19 tes JavaScript lulus**.
+Pasangan noncash kini dipilih dari master Salary Component; Save/migrate tidak membuat
+pasangan atau menimpa Accounts. Tes mencakup komponen manual bersama antar-Settings,
+beberapa sumber menjadi satu baris pasangan, snapshot per sumber, hitung ulang idempotent,
+penggantian pasangan pada draft, dan pasangan legacy tetap dapat digunakan.
+
+Validasi menolak potongan tunai pegawai, formula/condition/Amount tetap, flag salah,
+komponen pajak sebagai pasangan, sumber/pasangan tumpang tindih, akun salah, serta pasangan
+yang masuk Salary Structure/Additional Salary. Pemeriksaan ulang dan lock master/Account
+pada submit diuji. Pilihan pasangan serta perubahan akun master yang sudah dipakai submitted
+tetap dikunci. Uji hook migrate memastikan backfill/pembuatan pasangan telah dihentikan.
+
+Contract journal memakai metode asli HRMS v15 dengan DB/layanan tiruan. Skenario baru dua
+sumber memakai satu pasangan manual tetap menghasilkan jurnal seimbang dan Bank Entry =
+net pay. Gross, Gross Up, refund dan pencatatan per Employee/cost center tetap lulus.
+UI/schema mengizinkan pilihan pasangan dengan filter Deduction noncash; COA tidak kembali
+ke Settings. Pyflakes dan diff check lulus. PDF 0.8.0 (13 halaman) dirender dan diperiksa.
+
+Wheel, sdist dan source ZIP disiapkan. Tidak ada commit/push/deploy, penghapusan master,
+atau perubahan slip/jurnal submitted. Belum diverifikasi pada bench lengkap/Frappe Cloud;
+ikuti UAT.md dan UPGRADE_0_8.md. Mesin tarif, rumus, dan contoh angka pajak tidak diubah.
+
+
+## Cleansing 0.8.1 — pasangan otomatis yang belum dipakai
+
+Pemeriksaan 1 Oktober 2026: **140 tes Python lulus**, termasuk delapan tes cleansing baru.
+Tes meliputi preview tanpa penulisan, hapus orphan/pasangan beberapa Settings, pelestarian
+master manual/pajak, referensi slip/struktur/Additional Salary/formula, Settings submitted,
+identitas berbeda, rollback link mapping ketika native deletion ditolak, laporan private,
+serta registrasi patch post-schema dan pengulangan tanpa efek tambahan.
+
+API delete_doc Frappe v15 diperiksa: ignore_permissions didukung; force=False dan
+pemeriksaan link tetap aktif. Deleted Document archive tidak dinonaktifkan. Pengujian
+cleanup memakai database/delete/File double; transaksi MariaDB, migrate, dan penghapusan
+pada site nyata belum diuji. Tidak ada koneksi atau penghapusan langsung di Frappe Cloud.
+JavaScript tidak berubah dari 0.8.0 (19 tes lulus pada pemeriksaan sebelumnya).
+PDF 0.8.0 tetap disertakan dengan addendum CLEANSING_0_8_1.md.
+
+Pyflakes dan git diff --check lulus. Wheel, sdist dan ZIP source 0.8.1 dibangun;
+registrasi patch dan berkas cleansing diperiksa pada paket. Tidak ada commit/push/deploy.
+
+
+## Rilis 0.9.0 — tiga komponen pajak pilihan pengguna
+
+Pemeriksaan 1 Oktober 2026: **149 tes Python dan 20 tes JavaScript lulus**.
+Install/Save/migrate tidak lagi membuat master Salary Component. Schema menyediakan tiga
+pilihan wajib dan editable. Master bersama diuji lintas Settings untuk peran yang sama;
+master berbeda tetap mendukung pemisahan akun. Tipe/flag/Amount/formula/Accounts, peran
+bertentangan, sumber/pasangan tumpang tindih, dan perubahan pilihan setelah submitted ditolak.
+Penguncian pembulatan kini mengikuti pemakaian Settings, bukan pemakaian master bersama
+oleh Settings lain. Master manual terpilih tetap mendapat proteksi akun setelah submitted.
+
+Contract adapter dan jurnal memakai source HRMS v15 yang sudah dipin dalam pengujian
+sebelumnya. Nama manual dipakai pada Gross, Gross Up, final/refund, dua Settings/struktur,
+dan Bank Entry; jurnal seimbang, net pay benar, serta tidak ada suffix/duplikasi. Pilihan
+komponen pada snapshot lama dipakai untuk membersihkan keluaran draft saat berganti master.
+Formula sumber yang merujuk abbreviation pajak pilihan ditolak (circular dependency).
+
+Panduan PDF 0.9.0 terdiri dari 14 halaman, dirender dan diperiksa visual; contoh nama slip,
+tabel pilihan/master bersama, dan upgrade diperbarui. Tarif, mesin pajak dan angka studi
+kasus tidak berubah. Pyflakes dan diff check lulus; wheel, sdist, dan ZIP source dibangun.
+
+Batas validasi: DB, permission/locking, File, dan persistensi Journal Entry masih memakai
+test double. Migrate, tampilan Desk, dan posting jurnal nyata di Frappe Cloud belum diuji.
+Tidak ada commit/push/deploy atau perubahan master pada site. Pilihan/master pajak lama
+tidak dihapus/rename otomatis; patch cleansing noncash 0.8.1 tetap disertakan.

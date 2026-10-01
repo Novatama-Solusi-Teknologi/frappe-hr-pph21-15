@@ -1,5 +1,7 @@
 # Hotfix 0.7.1 - sinkronisasi pasangan noncash saat upgrade
 
+> Arsip rilis sebelumnya. Versi 0.8.0 menghentikan pembuatan pasangan noncash otomatis; lihat [UPGRADE_0_8.md](UPGRADE_0_8.md).
+
 ## Penyebab
 
 Kalkulasi payroll 0.7.0 menolak mapping yang field noncash_offset_component-nya belum

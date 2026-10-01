@@ -1,18 +1,18 @@
 import frappe
 from frappe.utils import getdate
 
-from frappe_hr_pph21.setup import component_role, component_has_submitted_slips
+from frappe_hr_pph21.setup import component_role, component_has_submitted_slips, is_noncash_offset, is_tax_component
 
 
 def validate_salary_structure(doc, method=None):
     for row in list(doc.get("earnings") or []) + list(doc.get("deductions") or []):
-        if component_role(row.salary_component):
-            frappe.throw("Komponen PPh21 Potongan Pajak ditambahkan otomatis ke Salary Slip. Hapus dari Salary Structure.")
+        if component_role(row.salary_component) or is_tax_component(row.salary_component) or is_noncash_offset(row.salary_component):
+            frappe.throw("Komponen pajak/pasangan noncash diisi oleh app. Hapus dari Salary Structure.")
 
 
 def validate_additional_salary(doc, method=None):
-    if component_role(doc.salary_component):
-        frappe.throw("Komponen PPh21 Potongan Pajak tidak boleh dimasukkan melalui Additional Salary.")
+    if component_role(doc.salary_component) or is_tax_component(doc.salary_component) or is_noncash_offset(doc.salary_component):
+        frappe.throw("Komponen pajak/pasangan noncash tidak boleh dimasukkan melalui Additional Salary.")
     if not doc.employee or not frappe.db.get_value("Employee", doc.employee, "pph21_enabled"):
         return
     # Prevent bonuses being added after the month's canonical slip is posted.
@@ -30,7 +30,7 @@ def validate_additional_salary(doc, method=None):
 
 
 def validate_generated_component(doc, method=None):
-    if not component_role(doc.name) and not frappe.db.exists("PPh21 Component Tax Mapping", {
+    if not component_role(doc.name) and not is_tax_component(doc.name) and not is_noncash_offset(doc.name) and not frappe.db.exists("PPh21 Component Tax Mapping", {
         "salary_component": doc.name, "noncash_offset_component": ["is", "set"],
     }):
         return
@@ -44,7 +44,7 @@ def validate_generated_component(doc, method=None):
     fields = ('type', 'salary_component_abbr', 'is_tax_applicable', 'depends_on_payment_days',
               'variable_based_on_taxable_salary', 'statistical_component', 'do_not_include_in_total',
               'is_flexible_benefit', 'amount_based_on_formula', 'only_tax_impact',
-              'do_not_include_in_accounts', 'formula', 'condition', 'disabled')
+              'do_not_include_in_accounts', 'formula', 'condition', 'amount', 'disabled')
     old_accounts = {r.company: r.account for r in old.accounts}
     new_accounts = {r.company: r.account for r in doc.accounts}
     for company in old_accounts.keys() | new_accounts.keys():

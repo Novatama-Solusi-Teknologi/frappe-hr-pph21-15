@@ -30,6 +30,7 @@ class SettingsTest(unittest.TestCase):
         global STORE
         STORE = {}
         self.posted = set()
+        self.saved_settings = []
         self.frappe = types.ModuleType('frappe')
         self.frappe.throw = lambda msg: (_ for _ in ()).throw(ValueError(msg))
         self.frappe.db = Box(exists=self.exists, get_value=self.get_value, sql=self.sql)
@@ -62,7 +63,13 @@ class SettingsTest(unittest.TestCase):
     def exists(self, dt, filters):
         if dt == 'Salary Component': return filters in STORE
         if dt == 'Salary Slip': return False
-        if dt == 'PPh21 Component Tax Mapping': return True
+        if dt == 'PPh21 Settings':
+            return any(all(s.get(k)==v for k,v in filters.items()) for s in self.saved_settings)
+        if dt == 'PPh21 Component Tax Mapping':
+            rows=[r for s in self.saved_settings for r in s.component_mapping]
+            if 'salary_component' in filters:
+                return any(r.salary_component==filters['salary_component'] and ('noncash_offset_component' not in filters or r.get('noncash_offset_component')) for r in rows)
+            return any(r.get('noncash_offset_component')==filters.get('noncash_offset_component') for r in rows)
         raise AssertionError(dt)
     def sql(self, query, args):
         if 'SELECT ss.name' in query:
@@ -73,10 +80,73 @@ class SettingsTest(unittest.TestCase):
         s = self.controller(name=name, settings_name='PUP - '+name, company='PUP', enabled=1,
                             expense_account=expense, tax_payable_account=payable,
                             component_mapping=[], rounding='Floor IDR')
-        s.validate(); s.on_update()
-        for base, name in self.setup.settings_components(s).items():
-            STORE[name].append('accounts', dict(company='PUP', account=expense if base==self.setup.ALLOWANCE else payable))
+        for role, field in self.setup.COMPONENT_FIELDS.items():
+            # Site/user masters, not app-generated names.
+            name = {'allowance_component':'Tunjangan Pajak', 'withholding_component':'Potongan Pajak',
+                    'refund_component':'Refund Pajak'}[field] + ' ' + s.name
+            self.make_tax_component(name, role, expense if role==self.setup.ALLOWANCE else payable)
+            s[field]=name
+        s.validate()
+        self.saved_settings.append(s)
         return s
+    def make_tax_component(self, name, role, account):
+        kind, _, taxable = self.setup.COMPONENTS[role]
+        STORE[name]=Component(name=name,type=kind,salary_component_abbr='C'+str(len(STORE)),
+            is_tax_applicable=taxable, accounts=[Box(company='PUP',account=account)])
+        return STORE[name]
+
+    def test_many_settings_share_existing_tax_masters_without_modifying_them(self):
+        a=self.settings()
+        before=copy.deepcopy(STORE)
+        b=self.controller(name='B',settings_name='PUP Produksi',company='PUP',enabled=1,
+            rounding='Floor IDR',component_mapping=[],**{f:a[f] for f in self.setup.COMPONENT_FIELDS.values()})
+        b.validate();self.saved_settings.append(b)
+        self.assertEqual(STORE,before)
+        self.assertEqual(self.setup.settings_components(a),self.setup.settings_components(b))
+        # Submitted use by A must not lock B's otherwise independent rounding.
+        self.posted.add(a.name);b._old=Doc(copy.deepcopy(b));b.rounding='Half Up IDR';b.validate()
+
+    def test_tax_component_selection_rejects_duplicate_roles_and_cross_settings_role_conflict(self):
+        s=self.settings();original=s.refund_component;s.refund_component=s.allowance_component
+        with self.assertRaisesRegex(ValueError,'tiga komponen berbeda'): s.validate()
+        s.refund_component=original
+        other=self.controller(name='B',settings_name='B',company='PUP',rounding='Floor IDR',component_mapping=[],
+            allowance_component=s.refund_component,refund_component=s.allowance_component,
+            withholding_component=s.withholding_component)
+        with self.assertRaisesRegex(ValueError,'peran pajak lain'): other.validate()
+
+    def test_manual_tax_master_flags_formula_and_account_validation(self):
+        s=self.settings();c=STORE[s.allowance_component]
+        for field,value in [('type','Deduction'),('is_tax_applicable',0),('depends_on_payment_days',1),
+                ('statistical_component',1),('do_not_include_in_total',1),('do_not_include_in_accounts',1),
+                ('variable_based_on_taxable_salary',1),('amount_based_on_formula',1),('disabled',1),
+                ('amount',500),('formula','base*.01'),('condition','1'),('salary_component_abbr','')]:
+            old=c.get(field);c[field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError): s.validate()
+            c[field]=old
+        c.accounts[0].account='Liability Wrong'
+        with self.assertRaisesRegex(ValueError,'Expense'): s.validate()
+
+    def test_tax_components_cannot_overlap_sources_or_noncash_pairs(self):
+        s=self.settings()
+        s.component_mapping=[Box(salary_component=s.allowance_component,treatment='Taxable Cash')]
+        with self.assertRaisesRegex(ValueError,'sumber mapping'): s.validate()
+        s.component_mapping=[Box(salary_component='BPJS',treatment='Taxable Noncash',noncash_offset_component=s.withholding_component)]
+        with self.assertRaisesRegex(ValueError,'pasangan noncash'): s.validate()
+        s.component_mapping=[]
+        other=self.noncash_settings('B')
+        name=other.component_mapping[0].noncash_offset_component
+        with self.assertRaisesRegex(ValueError,'pasangan noncash'):
+            self.setup.validate_component(name,role=self.setup.WITHHOLDING)
+        with self.assertRaisesRegex(ValueError,'Komponen pajak'):
+            self.setup.validate_noncash_component(s.withholding_component)
+
+    def test_install_and_migrate_have_no_salary_component_creator(self):
+        before=copy.deepcopy(STORE);self.setup.after_install();self.assertEqual(STORE,before)
+        self.assertFalse(hasattr(self.setup,'create_components'))
+        self.assertFalse(hasattr(self.controller,'on_update'))
+
+
     def test_worksheet_custom_field_hides_json_without_removing_it(self):
         captured={}
         self.setup.create_custom_fields=lambda fields,**kwargs: captured.update(fields)
@@ -113,19 +183,22 @@ class SettingsTest(unittest.TestCase):
         STORE['BPJS']=Component(name='BPJS',type='Earning',salary_component_abbr='BPJS',
             do_not_include_in_total=1,do_not_include_in_accounts=1,statistical_component=0,
             variable_based_on_taxable_salary=0,accounts=[Box(company='PUP',account='Expense BPJS')])
-        s.component_mapping=[Box(salary_component='BPJS',treatment=treatment,noncash_payable_account='Liability BPJS')]
-        s.validate();s.on_update()
-        STORE[s.component_mapping[0].noncash_offset_component].append('accounts',dict(company='PUP',account='Liability BPJS'))
+        pair='Utang BPJS Perusahaan'
+        if pair not in STORE:
+            STORE[pair]=Component(name=pair,type='Deduction',salary_component_abbr='UBPJS',do_not_include_in_total=1,
+                do_not_include_in_accounts=0,accounts=[Box(company='PUP',account='Liability BPJS')])
+        s.component_mapping=[Box(salary_component='BPJS',treatment=treatment,noncash_offset_component=pair)]
+        s.validate();s.validate()
         return s
 
-    def test_noncash_pair_is_created_once_with_liability_account_and_no_cash_impact(self):
+    def test_selected_noncash_pair_is_preserved_with_liability_account_and_no_cash_impact(self):
         s=self.noncash_settings()
         name=s.component_mapping[0].noncash_offset_component
-        pair=self.setup.validate_component(name)
+        pair=self.setup.validate_noncash_component(name)
         self.assertEqual((pair.type,pair.do_not_include_in_total,pair.do_not_include_in_accounts),('Deduction',1,0))
         self.assertEqual(pair.accounts[0].account,'Liability BPJS')
         self.assertEqual(STORE['BPJS'].do_not_include_in_accounts,1)  # master not silently rewritten
-        count=len(STORE);s.on_update();self.assertEqual(len(STORE),count)
+        count=len(STORE);s.validate();self.assertEqual(len(STORE),count)
         for validator,doc in [(self.validation.validate_salary_structure,Doc(earnings=[],deductions=[Box(salary_component=name)])),
                               (self.validation.validate_additional_salary,Doc(salary_component=name))]:
             with self.assertRaises(ValueError): validator(doc)
@@ -134,7 +207,7 @@ class SettingsTest(unittest.TestCase):
         s=self.noncash_settings(treatment='Non Taxable')
         self.assertTrue(s.component_mapping[0].noncash_offset_component)
         s.component_mapping[0].noncash_payable_account=None
-        s.validate();s.on_update()  # obsolete account field has no effect
+        s.validate();s.validate()  # obsolete account field has no effect
         self.assertEqual(STORE[s.component_mapping[0].noncash_offset_component].accounts[0].account,'Liability BPJS')
 
     def test_noncash_accounts_validate_root_company_and_posted_mapping_lock(self):
@@ -148,7 +221,7 @@ class SettingsTest(unittest.TestCase):
         self.frappe.get_doc=lambda dt,name=None,**kw: Doc(company='Other',root_type='Liability',is_group=0,account_currency='IDR') if name=='Wrong Co' else get_doc(dt,name,**kw)
         with self.assertRaisesRegex(ValueError,'Company'):
             self.setup.component_account(pair,'PUP','Liability')
-        s._old=Doc(copy.deepcopy(s));self.posted.add(pair.name)
+        s._old=Doc(copy.deepcopy(s));self.posted.add(s.name)
         m.treatment='Non Taxable'
         with self.assertRaisesRegex(ValueError,'submitted'): s.validate()
         s.component_mapping=[]
@@ -159,20 +232,20 @@ class SettingsTest(unittest.TestCase):
         self.posted.add('BPJS');source.accounts[0].account='Expense Changed'
         with self.assertRaisesRegex(ValueError,'dikunci'): self.validation.validate_generated_component(source)
 
-    def test_each_settings_gets_a_distinct_noncash_pair(self):
+    def test_settings_can_share_one_selected_noncash_pair(self):
         a=self.noncash_settings();b=self.noncash_settings('PPH21-SET-00002')
-        self.assertNotEqual(a.component_mapping[0].noncash_offset_component,b.component_mapping[0].noncash_offset_component)
+        self.assertEqual(a.component_mapping[0].noncash_offset_component,b.component_mapping[0].noncash_offset_component)
 
-    def test_two_settings_same_company_get_distinct_components_and_accounts(self):
+    def test_two_settings_can_select_different_existing_components_and_accounts(self):
         a = self.settings(); b = self.settings('PPH21-SET-00002','Expense B','Liability B')
         self.assertEqual(len(STORE),6)
         for s in (a,b):
             for base,name in self.setup.settings_components(s).items():
-                c = self.setup.validate_component(name)
+                c = self.setup.validate_component(name, role=base)
                 expected = s.expense_account if base == self.setup.ALLOWANCE else s.tax_payable_account
                 self.assertEqual(c.accounts[0].account,expected)
         self.assertNotEqual(a.allowance_component,b.allowance_component)
-        a.on_update(); self.assertEqual(len(STORE),6)
+        a.validate(); self.assertEqual(len(STORE),6)
     @unittest.skipUnless(PAYROLL_SOURCE.exists(),'Requires HRMS v15 Payroll Entry source')
     def test_native_payroll_entry_routes_mixed_settings_components_to_separate_accounts(self):
         a=self.settings(); b=self.settings('PPH21-SET-00002','Expense B','Liability B')
@@ -192,26 +265,30 @@ class SettingsTest(unittest.TestCase):
     def test_generated_components_cannot_enter_structure_or_additional_salary(self):
         s=self.settings()
         for name in self.setup.settings_components(s).values():
-            with self.assertRaisesRegex(ValueError,'otomatis'):
+            with self.assertRaisesRegex(ValueError,'diisi oleh app'):
                 self.validation.validate_salary_structure(Doc(earnings=[Box(salary_component=name)]))
             with self.assertRaisesRegex(ValueError,'Additional Salary'):
                 self.validation.validate_additional_salary(Doc(salary_component=name))
-    def test_company_immutable_and_client_component_links_ignored(self):
-        s=self.settings(); original=s.allowance_component
-        s._old=Doc(copy.deepcopy(s)); s.allowance_component='Hijacked';s.validate()
-        self.assertEqual(s.allowance_component,original)
+    def test_company_immutable_and_component_selection_can_change_before_submission(self):
+        s=self.settings(); s._old=Doc(copy.deepcopy(s))
+        self.make_tax_component('Tunjangan Bersama',self.setup.ALLOWANCE,'Expense Shared')
+        s.allowance_component='Tunjangan Bersama';s.validate()
+        self.assertEqual(s.allowance_component,'Tunjangan Bersama')
+        self.posted.add(s.name);s._old=Doc(copy.deepcopy(s))
+        s.allowance_component='Tunjangan Pajak PPH21-SET-00001'
+        with self.assertRaisesRegex(ValueError,'submitted'): s.validate()
         s.company='Other'
         with self.assertRaisesRegex(ValueError,'Company'): s.validate()
     def test_settings_never_overwrites_master_accounts_and_rounding_stays_locked(self):
         a=self.settings();b=self.settings('PPH21-SET-00002','Expense B','Liability B')
-        self.posted.add(a.allowance_component)
+        self.posted.add(a.name)
         a._old=Doc(copy.deepcopy(a));a.expense_account='Expense Obsolete'
-        a.validate();a.on_update()
+        a.validate();a.validate()
         self.assertEqual(STORE[a.allowance_component].accounts[0].account,'Expense A')
         a.rounding='Half Up IDR'
         with self.assertRaisesRegex(ValueError,'submitted'): a.validate()
         STORE[b.allowance_component].accounts[0].account='Expense Changed'
-        b.validate();b.on_update()
+        b.validate();b.validate()
         self.assertEqual(STORE[b.allowance_component].accounts[0].account,'Expense Changed')
 
     def test_posted_component_mapping_cannot_be_changed_manually(self):
@@ -243,29 +320,23 @@ class SettingsTest(unittest.TestCase):
         profile=records['PPh21 Employee Tax Profile'][0]
         self.assertEqual((profile.pph21_settings,profile.opening_tax),('PUP',123))
         self.assertFalse(records['PPh21 Employee Tax Profile'][1].pph21_settings)
-    def test_missing_legacy_accounts_can_be_configured_without_replacing_components(self):
-        self.setup.create_components()
-        s=self.controller(name='PUP',settings_name='PUP - Standar',company='PUP',expense_account='Expense Legacy',tax_payable_account='Liability Legacy',rounding='Floor IDR',component_mapping=[])
-        for base,field in self.setup.COMPONENT_FIELDS.items(): s[field]=base
-        s._old=Doc(copy.deepcopy(s));self.posted.add(self.setup.ALLOWANCE)
-        s.validate();s.on_update()
-        self.assertEqual(len(STORE),3)
-        self.assertEqual(STORE[self.setup.ALLOWANCE].accounts,[])
-        STORE[self.setup.ALLOWANCE].append('accounts',dict(company='PUP',account='Expense Legacy'))
-        s.on_update()
-        self.assertEqual(STORE[self.setup.ALLOWANCE].accounts[0].account,'Expense Legacy')
+    def test_legacy_selected_components_are_preserved_without_creating_more(self):
+        s=self.settings()
+        for role,field in self.setup.COMPONENT_FIELDS.items():
+            self.make_tax_component(role,role,'Expense Legacy' if role==self.setup.ALLOWANCE else 'Liability Legacy')
+            s[field]=role
+        s._old=Doc(copy.deepcopy(s));self.posted.add(s.name)
+        before=copy.deepcopy(STORE);s.validate()
+        self.assertEqual(STORE,before)
+        self.assertEqual(s.allowance_component,self.setup.ALLOWANCE)
 
-    def test_new_settings_and_noncash_pair_can_save_before_accounts_are_configured(self):
+    def test_new_settings_requires_selected_masters_and_accounts_without_creating_any(self):
         s=self.controller(name='NEW',settings_name='New',company='PUP',rounding='Floor IDR',component_mapping=[])
-        s.validate();s.on_update()
+        with self.assertRaisesRegex(ValueError,'Pilih komponen'): s.validate()
+        self.assertEqual(STORE,{})
+        s=self.settings();STORE[s.allowance_component].accounts=[]
+        with self.assertRaisesRegex(ValueError,'tepat satu akun'): s.validate()
         self.assertEqual(STORE[s.allowance_component].accounts,[])
-        s=self.noncash_settings()
-        pair=STORE[s.component_mapping[0].noncash_offset_component]
-        pair.accounts=[]
-        s.on_update()
-        self.assertEqual(pair.accounts,[])
-        with self.assertRaisesRegex(ValueError,'tepat satu akun'):
-            self.setup.component_account(pair,'PUP','Liability')
 
     def test_duplicate_company_account_is_rejected_but_multiple_companies_are_allowed(self):
         s=self.settings();c=STORE[s.allowance_component]
@@ -277,56 +348,51 @@ class SettingsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'satu baris'):
             self.validation.validate_generated_component(c)
 
-    def migration_fixture(self, settings):
-        original=self.frappe.get_doc
-        self.frappe.get_all=lambda dt,**kw: [Box(name=s.name) for s in settings]
-        self.frappe.get_doc=lambda dt,name=None,**kw: next(s for s in settings if s.name==name) if dt=='PPh21 Settings' else original(dt,name,**kw)
-        changes=[]
-        def set_value(dt,name,field,value,**kwargs):
-            self.assertEqual(dt,'PPh21 Component Tax Mapping')
-            self.assertFalse(kwargs['update_modified'])
-            changes.append((name,field,value))
-            for s in settings:
-                for row in s.component_mapping:
-                    if row.name==name: row[field]=value
-        self.frappe.db.set_value=set_value
-        self.frappe.clear_document_cache=lambda *a: None
-        return changes
+    def test_manual_pair_is_required_and_no_pair_is_created_during_save(self):
+        s=self.noncash_settings();s.component_mapping[0].noncash_offset_component=None
+        before=set(STORE)
+        with self.assertRaisesRegex(ValueError,'pilih Komponen Pasangan'): s.validate()
+        self.assertEqual(set(STORE),before)
+        self.assertFalse(any(n.startswith(self.setup.NONCASH_OFFSET) for n in STORE))
 
-    def test_upgrade_backfills_missing_noncash_pair_without_saving_settings_or_choosing_account(self):
-        s=self.noncash_settings();row=s.component_mapping[0];row.name='LEGACY-ROW'
-        expected=row.noncash_offset_component
-        del STORE[expected];row.noncash_offset_component=None
-        self.posted.add(s.name)  # existing submitted history must not block metadata backfill
-        changes=self.migration_fixture([s])
-        self.setup.sync_noncash_components()
-        self.assertEqual(row.noncash_offset_component,expected)
-        self.assertEqual(STORE[expected].accounts,[])
-        self.assertEqual(STORE['BPJS'].accounts[0].account,'Expense BPJS')
-        self.assertEqual(changes,[('LEGACY-ROW','noncash_offset_component',expected)])
-        STORE[expected].append('accounts',dict(company='PUP',account='Liability User'))
-        count=len(STORE);self.setup.sync_noncash_components()
-        self.assertEqual(len(STORE),count);self.assertEqual(len(changes),1)
-        self.assertEqual(STORE[expected].accounts[0].account,'Liability User')
+    def test_manual_pair_rejects_cash_deduction_formula_earning_and_tax_components(self):
+        s=self.noncash_settings();pair=STORE[s.component_mapping[0].noncash_offset_component]
+        for field,value in [('do_not_include_in_total',0),('do_not_include_in_accounts',1),('type','Earning'),
+                            ('depends_on_payment_days',1),('formula','base * 0.01'),('condition','1'),('amount',10),
+                            ('disabled',1),('statistical_component',1),('is_tax_applicable',1)]:
+            original=pair.get(field);pair[field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError): s.validate()
+            pair[field]=original
+        s.component_mapping[0].noncash_offset_component=s.withholding_component
+        with self.assertRaisesRegex(ValueError,'Komponen pajak'): s.validate()
 
-    def test_upgrade_reconnects_existing_pair_and_preserves_its_accounts(self):
-        s=self.noncash_settings(treatment='Non Taxable');row=s.component_mapping[0]
-        row.name='NON-TAXABLE';expected=row.noncash_offset_component;row.noncash_offset_component=''
-        self.migration_fixture([s]);self.setup.sync_noncash_components()
-        self.assertEqual(row.noncash_offset_component,expected)
-        self.assertEqual(STORE[expected].accounts[0].account,'Liability BPJS')
+    def test_selected_pair_cannot_also_be_tax_mapping_source(self):
+        s=self.noncash_settings();pair=s.component_mapping[0].noncash_offset_component
+        s.component_mapping.append(Box(salary_component=pair,treatment='Ignore'))
+        with self.assertRaisesRegex(ValueError,'sekaligus'): s.validate()
 
-    def test_upgrade_skips_cash_and_conflicting_pair_links(self):
-        s=self.noncash_settings();row=s.component_mapping[0];row.name='EXISTING'
-        row.noncash_offset_component='Another pair'
-        STORE['Cash']=Component(name='Cash',type='Earning',do_not_include_in_total=0)
-        s.component_mapping.append(Box(name='CASH',salary_component='Cash',treatment='Taxable Cash'))
-        changes=self.migration_fixture([s]);count=len(STORE)
-        self.setup.sync_noncash_components()
-        self.assertEqual(row.noncash_offset_component,'Another pair')
-        self.assertFalse(changes);self.assertEqual(len(STORE),count)
+    def test_selected_pair_link_and_master_are_locked_after_submitted(self):
+        s=self.noncash_settings();s._old=Doc(copy.deepcopy(s));self.posted.add(s.name)
+        s.component_mapping[0].noncash_offset_component='Different Pair'
+        with self.assertRaisesRegex(ValueError,'submitted'): s.validate()
+        pair=STORE[s._old.component_mapping[0].noncash_offset_component]
+        s.component_mapping[0].noncash_offset_component=pair.name
+        pair._old=Doc(copy.deepcopy(pair));self.posted.add(pair.name)
+        pair.accounts[0].account='Liability New'
+        with self.assertRaisesRegex(ValueError,'dikunci'): self.validation.validate_generated_component(pair)
 
-    def test_after_migrate_runs_backfill_after_settings_migration(self):
+    def test_legacy_pair_remains_usable_without_creation_or_renaming(self):
+        s=self.noncash_settings();row=s.component_mapping[0]
+        pair=STORE[row.noncash_offset_component]
+        name=self.setup.noncash_component_name(s.name,row.salary_component)
+        legacy=Component(copy.deepcopy(pair));legacy.name=name;STORE[name]=legacy
+        row.noncash_offset_component=name;before=set(STORE)
+        s.validate();s.validate()
+        self.assertEqual(row.noncash_offset_component,name)
+        self.assertEqual(set(STORE),before)
+        self.assertEqual(legacy.accounts[0].account,'Liability BPJS')
+
+    def test_after_migrate_never_creates_or_backfills_noncash_pairs(self):
         calls=[]
         fiscal=types.ModuleType('frappe_hr_pph21.fiscal_year')
         fiscal.backfill_fiscal_year_links=lambda: calls.append('fiscal')
@@ -334,12 +400,12 @@ class SettingsTest(unittest.TestCase):
         settings.migrate_settings_links=lambda: calls.append('settings')
         workspace=types.ModuleType('frappe_hr_pph21.workspace')
         workspace.sync_navigation=lambda: calls.append('workspace')
-        names=('check_versions','sync_custom_fields','create_components','sync_mapping_codes','sync_noncash_components')
+        names=('check_versions','sync_custom_fields','sync_mapping_codes')
         with patch.dict(sys.modules, {'frappe_hr_pph21.fiscal_year':fiscal,
                 'frappe_hr_pph21.settings':settings,'frappe_hr_pph21.workspace':workspace}):
             with patch.multiple(self.setup, **{n:(lambda name=n: calls.append(name)) for n in names}):
                 self.setup.after_migrate()
-        self.assertEqual(calls,['check_versions','sync_custom_fields','create_components','sync_mapping_codes',
-                               'fiscal','settings','sync_noncash_components','workspace'])
+        self.assertEqual(calls,['check_versions','sync_custom_fields','sync_mapping_codes',
+                               'fiscal','settings','workspace'])
 
 if __name__ == '__main__': unittest.main()

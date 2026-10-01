@@ -1,5 +1,7 @@
 # Upgrade 0.7.0 - COA hanya di Salary Component
 
+> Arsip rilis sebelumnya. Versi 0.8.0 menghentikan pembuatan pasangan noncash otomatis; lihat [UPGRADE_0_8.md](UPGRADE_0_8.md).
+
 PPh21 Settings dan detail mapping tidak lagi mempunyai pilihan Account. Semua COA dibaca
 dari tabel **Accounts** pada masing-masing Salary Component, sesuai Company payroll.
 Menyimpan Settings tidak menulis, menyalin ulang, atau menimpa Accounts.

@@ -33,7 +33,7 @@ def journal_contract(slip, env, employee_wise=False):
             component = name['parent']
             assert field == 'account'
             if component == 'Basic': return 'Salary Expense'
-            if component == 'BPJS': return 'Expense BPJS'
+            if component in ('BPJS','BPJS Pension'): return 'Expense BPJS'
             if component == 'Employee BPJS': return 'Liability BPJS'
             return env.component(component).accounts[0].account
         if dt == 'Salary Component':
@@ -111,6 +111,34 @@ class PayrollJournalTest(unittest.TestCase):
         for method, treatment in [('Gross', 'Taxable Noncash'), ('Gross Up', 'Non Taxable')]:
             with self.subTest(method=method, treatment=treatment):
                 self.assert_journal(self.fixture(method, treatment))
+
+    def test_two_sources_share_a_manual_pair_in_native_payroll_and_bank_entries(self):
+        case=self.fixture()
+        case.slip.templates['earnings'][-1].amount=400000
+        case.slip.templates['earnings'][-1].default_amount=400000
+        case.env.salary_components['BPJS Pension']=adapter.Box(case.env.salary_components['BPJS'],name='BPJS Pension')
+        case.env.settings.component_mapping.append(case.noncash_mapping('BPJS Pension','Non Taxable'))
+        case.slip.templates['earnings'].append(adapter.row('BPJS Pension',80000,0))
+        self.assert_journal(case,True)
+        pairs=[r for r in case.slip.deductions if r.salary_component=='Utang BPJS Perusahaan']
+        self.assertEqual(len(pairs),1);self.assertEqual(pairs[0].amount,480000)
+
+    def test_shared_manual_tax_names_work_across_settings_structures_and_methods(self):
+        for method,setting,structure in [('Gross Up','Office','Office Salary'),('Gross','Factory','Factory Salary')]:
+            with self.subTest(method=method):
+                case=self.fixture(method)
+                case.select_manual_tax_components()
+                case.env.settings.name=setting;case.env.profile.pph21_settings=setting
+                case.slip.salary_structure=structure
+                slip=self.assert_journal(case,True)
+                self.assertEqual([r.salary_component for r in slip.deductions if r.salary_component=='PPh21'],['PPh21'])
+                self.assertFalse(any('PPH21-SET' in r.salary_component for r in slip.earnings+slip.deductions))
+        case=self.fixture();case.select_manual_tax_components()
+        case.env.employee.relieving_date=adapter.date(2026,2,25)
+        case.set_period('2026-01-26','2026-02-25','2026-02-25')
+        case.env.profile.update(opening_through_month=1,opening_gross=10230179,opening_tax=230179)
+        slip=self.assert_journal(case,True)
+        self.assertEqual([r.amount for r in slip.earnings if r.salary_component=='Refund PPh21'],[230179])
 
     def test_final_refund_debits_tax_payable_without_losing_bpjs_liability(self):
         case = self.fixture()

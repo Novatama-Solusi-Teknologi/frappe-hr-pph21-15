@@ -1,3 +1,4 @@
 [pre_model_sync]
 
 [post_model_sync]
+frappe_hr_pph21.patches.v0_8_1_cleanup_noncash

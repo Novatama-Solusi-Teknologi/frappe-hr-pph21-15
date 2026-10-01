@@ -19,7 +19,13 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 test('Settings configures component lookup without account queries', () => {
   const {handlers} = harness('pph21_settings'), queries = {};
   handlers['PPh21 Settings'].setup({set_query:(f,a,b)=>queries[f]=b||a});
-  assert.deepEqual(Object.keys(queries),['salary_component']);
+  assert.deepEqual(Object.keys(queries),['allowance_component','withholding_component','refund_component','noncash_offset_component','salary_component']);
+  assert.equal(queries.allowance_component().filters.is_tax_applicable,1);
+  assert.equal(queries.withholding_component().filters.type,'Deduction');
+  assert.equal(queries.refund_component().filters.is_tax_applicable,0);
+  assert.equal(queries.noncash_offset_component().filters.type,'Deduction');
+  assert.equal(queries.noncash_offset_component().filters.do_not_include_in_total,1);
+  assert.equal(queries.noncash_offset_component().filters.do_not_include_in_accounts,0);
   assert.equal(queries.salary_component().query,'frappe_hr_pph21.queries.salary_component_query');
 });
 test('bulk new rows inherit defaults without overwriting existing rows', async () => {
@@ -105,5 +111,24 @@ test('Settings and tax mapping have no Account selectors', () => {
   for (const slug of ['pph21_settings','pph21_component_tax_mapping']) {
     const meta=JSON.parse(fs.readFileSync(path.join(base,slug,slug+'.json'),'utf8'));
     assert.equal(meta.fields.some(f=>f.fieldtype==='Link' && f.options==='Account'),false);
+  }
+});
+
+test('noncash pair is an editable Salary Component link', () => {
+  const meta=JSON.parse(fs.readFileSync(path.join(base,'pph21_component_tax_mapping/pph21_component_tax_mapping.json'),'utf8'));
+  const field=meta.fields.find(f=>f.fieldname==='noncash_offset_component');
+  assert.equal(field.read_only,0);
+  assert.equal(field.options,'Salary Component');
+});
+
+
+test('three tax roles are required editable reusable Salary Component links', () => {
+  const meta=JSON.parse(fs.readFileSync(path.join(base,'pph21_settings/pph21_settings.json'),'utf8'));
+  for (const name of ['allowance_component','withholding_component','refund_component']) {
+    const field=meta.fields.find(f=>f.fieldname===name);
+    assert.ok(!field.read_only);
+    assert.ok(!field.no_copy);
+    assert.equal(field.reqd,1);
+    assert.equal(field.options,'Salary Component');
   }
 });

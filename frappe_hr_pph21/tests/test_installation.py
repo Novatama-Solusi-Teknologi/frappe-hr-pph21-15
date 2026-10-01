@@ -4,7 +4,7 @@ from frappe.model.base_document import get_controller
 from frappe.tests.utils import FrappeTestCase
 
 from frappe_hr_pph21.overrides.salary_slip import PPh21SalarySlip
-from frappe_hr_pph21.setup import COMPONENTS, create_components, validate_component
+from frappe_hr_pph21.setup import after_install
 
 
 class TestPPh21Installation(FrappeTestCase):
@@ -24,12 +24,14 @@ class TestPPh21Installation(FrappeTestCase):
         self.assertTrue(frappe.get_meta('PPh21 Component Tax Mapping').has_field('component_abbr'))
         self.assertTrue(issubclass(get_controller('Salary Slip'), PPh21SalarySlip))
 
-    def test_components_and_idempotent_seed(self):
-        original = {name: frappe.get_doc('Salary Component', name).as_dict() for name in COMPONENTS}
-        create_components()
-        for name in COMPONENTS:
-            doc = validate_component(name)
-            self.assertEqual(doc.modified, original[name]['modified'])
+    def test_install_does_not_create_components(self):
+        original = set(frappe.get_all('Salary Component', pluck='name'))
+        after_install()
+        self.assertEqual(set(frappe.get_all('Salary Component', pluck='name')), original)
+        for field in ('allowance_component', 'withholding_component', 'refund_component'):
+            spec = frappe.get_meta('PPh21 Settings').get_field(field)
+            self.assertFalse(spec.read_only)
+            self.assertTrue(spec.reqd)
 
     def test_reports_and_workspace(self):
         self.assertTrue(frappe.db.exists('Workspace', 'PPh 21'))
