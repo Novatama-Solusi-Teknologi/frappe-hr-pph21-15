@@ -19,13 +19,10 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 test('Settings configures component lookup without account queries', () => {
   const {handlers} = harness('pph21_settings'), queries = {};
   handlers['PPh21 Settings'].setup({set_query:(f,a,b)=>queries[f]=b||a});
-  assert.deepEqual(Object.keys(queries),['allowance_component','withholding_component','refund_component','noncash_offset_component','salary_component']);
+  assert.deepEqual(Object.keys(queries),['allowance_component','withholding_component','refund_component','salary_component']);
   assert.equal(queries.allowance_component().filters.is_tax_applicable,1);
   assert.equal(queries.withholding_component().filters.type,'Deduction');
   assert.equal(queries.refund_component().filters.is_tax_applicable,0);
-  assert.equal(queries.noncash_offset_component().filters.type,'Deduction');
-  assert.equal(queries.noncash_offset_component().filters.do_not_include_in_total,1);
-  assert.equal(queries.noncash_offset_component().filters.do_not_include_in_accounts,0);
   assert.equal(queries.salary_component().query,'frappe_hr_pph21.queries.salary_component_query');
 });
 test('bulk new rows inherit defaults without overwriting existing rows', async () => {
@@ -114,10 +111,11 @@ test('Settings and tax mapping have no Account selectors', () => {
   }
 });
 
-test('noncash pair is an editable Salary Component link', () => {
+test('legacy noncash pair is hidden and read only', () => {
   const meta=JSON.parse(fs.readFileSync(path.join(base,'pph21_component_tax_mapping/pph21_component_tax_mapping.json'),'utf8'));
   const field=meta.fields.find(f=>f.fieldname==='noncash_offset_component');
-  assert.equal(field.read_only,0);
+  assert.equal(field.read_only,1);
+  assert.equal(field.hidden,1);
   assert.equal(field.options,'Salary Component');
 });
 
@@ -131,4 +129,19 @@ test('three tax roles are required editable reusable Salary Component links', ()
     assert.equal(field.reqd,1);
     assert.equal(field.options,'Salary Component');
   }
+});
+
+
+test('noncash payable filters per row Company and resets when Company changes', async () => {
+  const handlers={},queries={},locals={'Salary Component Account':{a:{company:'PUP'},b:{company:'OTHER'}}};
+  const frappe={ui:{form:{on:(dt,obj)=>handlers[dt]=obj}},model:{set_value:async (dt,name,field,value)=>locals[dt][name][field]=value}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../frappe_hr_pph21/public/js/salary_component.js'),'utf8'),{frappe,locals});
+  handlers['Salary Component'].setup({set_query:(field,table,fn)=>queries[field]=fn});
+  const query=queries.pph21_noncash_payable_account;
+  assert.equal(query({},'Salary Component Account','a').filters.company,'PUP');
+  assert.equal(query({},'Salary Component Account','b').filters.company,'OTHER');
+  assert.equal(query({},'Salary Component Account','a').filters.root_type,'Liability');
+  locals['Salary Component Account'].a.pph21_noncash_payable_account='Old Account';
+  await handlers['Salary Component Account'].company({},'Salary Component Account','a');
+  assert.equal(locals['Salary Component Account'].a.pph21_noncash_payable_account,null);
 });

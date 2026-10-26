@@ -71,10 +71,13 @@ def check_versions():
                           ("hrms", hrms.__version__)):
         if str(version).split('.')[0] != "15":
             frappe.throw(f"Frappe HR PPh21 memerlukan {name} v15; ditemukan {version}.")
-    overrides = frappe.get_hooks("override_doctype_class").get("Salary Slip", [])
-    expected = "frappe_hr_pph21.overrides.salary_slip.PPh21SalarySlip"
-    if any(path != expected for path in overrides):
-        frappe.throw("Ada app lain yang override Salary Slip. Gabungkan integrasi sebelum install Frappe HR PPh21.")
+    for doctype, expected in {
+        "Salary Slip": "frappe_hr_pph21.overrides.salary_slip.PPh21SalarySlip",
+        "Payroll Entry": "frappe_hr_pph21.overrides.payroll_entry.PPh21PayrollEntry",
+    }.items():
+        overrides = frappe.get_hooks("override_doctype_class").get(doctype, [])
+        if any(path != expected for path in overrides):
+            frappe.throw(f"Ada app lain yang override {doctype}. Gabungkan integrasi sebelum install Frappe HR PPh21.")
 
 
 def after_install():
@@ -162,6 +165,10 @@ def sync_custom_fields():
         "Employee": [dict(fieldname="pph21_enabled", label="PPh21 Enabled", fieldtype="Check",
                           default="0", insert_after="employment_type",
                           description="Memerlukan profil pajak PPh21 per tahun dan pengaturan perusahaan.")],
+        "Salary Component Account": [dict(fieldname="pph21_noncash_payable_account",
+            label="Akun Utang Noncash", fieldtype="Link", options="Account",
+            insert_after="account", in_list_view=1,
+            description="Untuk Earning noncash: Account biasa adalah beban; pilih akun Liability Company yang sama untuk kredit utang. Tidak memerlukan komponen pasangan.")],
         "Salary Slip": fields,
     }, update=True)
 
@@ -251,3 +258,14 @@ def is_noncash_offset(name):
     return bool(name and frappe.db.exists("PPh21 Component Tax Mapping", {
         "noncash_offset_component": name,
     }))
+
+
+def noncash_accounts(component, company, for_update=False):
+    """Expense and liability are two fields on the SAME per-company Accounts row."""
+    expense = component_account(component, company, "Expense", for_update)
+    row = next(r for r in component.accounts if r.company == company)
+    payable = row.get("pph21_noncash_payable_account")
+    if not payable:
+        frappe.throw(f"Salary Component {component.name}: isi Akun Utang Noncash pada baris Accounts untuk {company}. Account biasa adalah akun beban; tidak perlu komponen pasangan.")
+    return dict(component=component.name, expense_account=expense,
+                payable_account=validate_noncash_account(payable, company, "Liability", for_update))

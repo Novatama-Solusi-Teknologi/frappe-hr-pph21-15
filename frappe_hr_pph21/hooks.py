@@ -13,10 +13,11 @@ after_install = "frappe_hr_pph21.setup.after_install"
 after_migrate = "frappe_hr_pph21.setup.after_migrate"
 
 override_doctype_class = {
+    "Payroll Entry": "frappe_hr_pph21.overrides.payroll_entry.PPh21PayrollEntry",
     "Salary Slip": "frappe_hr_pph21.overrides.salary_slip.PPh21SalarySlip",
 }
 
-doctype_js = {"Salary Slip": "public/js/salary_slip.js"}
+doctype_js = {"Salary Slip": "public/js/salary_slip.js", "Salary Component": "public/js/salary_component.js"}
 
 has_permission = {
     "Bulk PPh21 Employee Tax Profile": "frappe_hr_pph21.queries.bulk_profile_permission",

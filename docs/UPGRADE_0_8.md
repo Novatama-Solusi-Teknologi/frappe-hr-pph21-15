@@ -1,5 +1,8 @@
 # Upgrade 0.8.0 - pilih komponen pasangan noncash yang sudah ada
 
+> **Perubahan 0.10.0:** noncash memakai Akun Utang Noncash pada Accounts sumber, tanpa
+> komponen pasangan baru. Lihat [upgrade 0.10.0](UPGRADE_0_10.md). Dokumen ini mencatat versi sebelumnya.
+
 > **Tambahan 0.8.1:** pasangan otomatis lama yang belum dipakai kini dibersihkan satu kali saat migrate.
 > Link mapping terkait dikosongkan. Lihat [cleansing 0.8.1](CLEANSING_0_8_1.md);
 > keterangan pelestarian seluruh pasangan di bawah menjelaskan perilaku rilis 0.8.0.

@@ -46,15 +46,17 @@
     {
       "fieldname": "noncash_section",
       "fieldtype": "Section Break",
-      "label": "Pasangan Jurnal Noncash"
+      "label": "Pasangan Jurnal Noncash",
+      "hidden": 1
     },
     {
       "fieldname": "noncash_offset_component",
       "fieldtype": "Link",
       "options": "Salary Component",
-      "label": "Komponen Pasangan Noncash",
-      "read_only": 0,
-      "description": "Pilih Salary Component Deduction khusus jurnal yang sudah ada (tidak memotong THP). Accounts harus berisi akun utang Company ini. Nominal diisi app dari sumber noncash; jangan masukkan pasangan ke Salary Structure/Additional Salary."
+      "label": "Komponen Pasangan Lama (Histori)",
+      "read_only": 1,
+      "description": "Hanya untuk kompatibilitas data lama. Sejak 0.10, akun pasangan berasal dari Accounts komponen sumber.",
+      "hidden": 1
     }
   ],
   "track_changes": 0,

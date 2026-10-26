@@ -1,4 +1,4 @@
-# Konfigurasi PT PUP - rilis 0.9.0
+# Konfigurasi PT PUP - rilis 0.10.0
 
 Form master memakai 2-3 kolom; tabel mapping tetap selebar form.
 Profil massal dapat dibuat melalui [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md).
@@ -76,20 +76,18 @@ Untuk Noncash gunakan Salary Component **Earning** dengan:
 - `Do Not Include in Accounting Entries = 0`
 - `Statistical Component = 0`
 
-HRMS v15 tidak menyimpan Statistical Component sebagai baris Salary Slip; karena itu tidak
-bisa menjadi sumber audit nominal noncash di app ini. Isi akun **Expense** pada Accounts
-Salary Component untuk Company. Pada detail mapping, pilih **Komponen Pasangan Noncash**
-yang sudah ada. Accounts pasangan harus berisi akun Liability. Save/migrate tidak membuat pasangan baru. Beban dan utang masuk jurnal
-payroll yang sama tanpa mengubah THP. Berlaku juga untuk JHT/JP perusahaan yang memenuhi
-pengecualian, dengan mapping Non Taxable dan Do Not Include in Total = 1.
-Pasangan harus Deduction, Do Not Include in Total = 1, Accounting Entries = 0; Amount nol,
-formula/condition kosong; Depends on Payment Days/Statistical/Tax Applicable/Flexible Benefit/
-Only Tax Impact tidak dicentang. Abbreviation wajib. Jangan gunakan potongan tunai BPJS pegawai.
-Jangan masukkan pasangan pilihan ke struktur/Additional Salary; app mengisi nominalnya.
-Satu pasangan dapat dipakai beberapa Settings/sumber dengan akun Company sesuai; nominal
-digabung menjadi satu baris per pasangan pada slip. Komponen pajak lama tidak dihapus otomatis; pasangan noncash legacy bebas referensi dibersihkan satu kali oleh patch 0.8.1.
-Pengaturan accounting lama = 1 tetap diselaraskan menjadi 0 pada slip yang dihitung oleh app,
-tanpa menulis ulang master bersama. [Panduan jurnal payroll](UPGRADE_0_8.md).
+HRMS v15 tidak menyimpan Statistical Component sebagai baris Salary Slip; karena itu
+komponen sumber noncash bukan Statistical. Pada **Accounts komponen sumber**, isi satu
+baris per Company: **Account** = akun Expense, **Akun Utang Noncash** = akun Liability.
+Kedua akun aktif, non-group, IDR, dan Company sama. Tidak perlu master pasangan Deduction
+atau pilihan pasangan pada Settings. Jika dua akun saat ini berada pada dua baris dengan
+Company sama, susun menjadi dua kolom pada satu baris tersebut.
+
+App memasukkan debit beban dan kredit utang langsung pada Journal Entry Payroll Entry
+yang sama. Bank Entry tidak membayar nominal noncash. Berlaku juga untuk Earning noncash
+Non Taxable/Ignore. Potongan BPJS pegawai tetap komponen tunai tersendiri.
+Akun dibekukan dalam snapshot; slip submitted lama tetap memakai alur pasangan lamanya.
+Lihat [upgrade dan migrasi akun 0.10.0](UPGRADE_0_10.md).
 
 Formula BPJS yang ada tetap dikelola Salary Structure. App tidak menentukan batas upah,
 persentase iuran, atau klasifikasi risiko JKK. Jangan membuat formula komponen dasar bergantung
@@ -217,8 +215,8 @@ account Salary Component saat Payroll Entry belum selesai diposting; selesaikan 
 ## Checkbox noncash setelah perubahan Salary Component
 
 Mulai 0.6.0, noncash tetap tidak masuk total tunai tetapi masuk jurnal. App menyelaraskan
-flag baris dan mengisi nominal pasangan pilihan. Statistical Component harus tidak dicentang
-pada master maupun baris struktur. [Langkah konfigurasi](UPGRADE_0_8.md).
+flag baris; sejak 0.10.0 debit beban dan kredit utang memakai akun langsung. Statistical
+Component harus tidak dicentang pada master maupun baris struktur. [Langkah konfigurasi](UPGRADE_0_10.md).
 
 
 ## Membaca kertas kerja

@@ -3,7 +3,7 @@ from frappe.model.document import Document
 
 from frappe_hr_pph21.setup import (ALLOWANCE, COMPONENT_FIELDS, component_role,
                                   settings_components, validate_component, is_tax_component, settings_has_submitted_slips,
-                                  validate_noncash_component, component_account)
+                                  noncash_accounts, component_account)
 from frappe_hr_pph21.tax.rules import RULE_VERSION
 
 
@@ -23,9 +23,8 @@ class PPh21Settings(Document):
         if changed and settings_has_submitted_slips(self.name):
             frappe.throw('Pilihan komponen/pembulatan Settings sudah dipakai slip submitted; gunakan Settings baru.')
         sources = {r.salary_component for r in self.component_mapping}
-        pairs = {r.get("noncash_offset_component") for r in self.component_mapping}
         for role, name in selected.items():
-            if name in sources | pairs:
+            if name in sources:
                 frappe.throw("Komponen pajak tidak boleh sekaligus menjadi sumber mapping atau pasangan noncash.")
             component = validate_component(name, role=role, for_update=True)
             component_account(component, self.company,
@@ -39,7 +38,8 @@ class PPh21Settings(Document):
             for previous in old.component_mapping or []:
                 before = (previous.treatment, previous.get("noncash_offset_component"))
                 after = current.get(previous.salary_component)
-                if previous.get("noncash_offset_component") and (not after or before != (after.treatment, after.get("noncash_offset_component"))) and settings_has_submitted_slips(self.name):
+                was_noncash = previous.treatment == "Taxable Noncash" or previous.get("noncash_offset_component") or frappe.get_doc("Salary Component", previous.salary_component).do_not_include_in_total
+                if was_noncash and (not after or before != (after.treatment, after.get("noncash_offset_component"))) and settings_has_submitted_slips(self.name):
                     frappe.throw("Mapping noncash telah dipakai slip submitted; gunakan Settings baru atau koreksi slip terlebih dahulu.")
         seen = set()
         for row in self.component_mapping:
@@ -62,14 +62,6 @@ class PPh21Settings(Document):
                     frappe.throw(f"{row.salary_component}: noncash harus Do Not Include in Total, dengan mapping Taxable Noncash/Non Taxable/Ignore.")
                 if component.get("only_tax_impact") or component.get("is_flexible_benefit"):
                     frappe.throw(f"{row.salary_component}: noncash BPJS tidak boleh Only Tax Impact atau Flexible Benefit.")
-                if not row.get("noncash_offset_component"):
-                    frappe.throw(f"{row.salary_component}: pilih Komponen Pasangan Noncash yang sudah ada di Salary Component.")
-                if row.noncash_offset_component in sources:
-                    frappe.throw("Komponen pasangan noncash tidak boleh sekaligus menjadi komponen sumber pada mapping.")
-                offset = validate_noncash_component(row.noncash_offset_component)
-                component_account(offset, self.company, "Liability")
-            else:
-                if row.get("noncash_offset_component"):
-                    frappe.throw(f"{row.salary_component}: kosongkan Komponen Pasangan Noncash karena komponen ini bukan Earning noncash.")
+                noncash_accounts(component, self.company)
             if component.variable_based_on_taxable_salary:
                 frappe.throw("Jangan petakan komponen pajak standar ke PPh21; hapus dari struktur pegawai PPh21.")

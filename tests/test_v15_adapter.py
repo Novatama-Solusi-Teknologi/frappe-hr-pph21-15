@@ -2,7 +2,6 @@
 Not a substitute for bench installation/SQL/GL integration tests.
 """
 import ast
-import copy
 from datetime import date
 from decimal import Decimal
 import importlib.util
@@ -46,7 +45,7 @@ class Environment:
         self.tax_accounts={ALLOWANCE:'Tax Expense',TAX:'Tax Payable',REFUND:'Tax Payable'}
         self.structure, self.history = Box(earnings=[], deductions=[]), []
         self.salary_components = {
-            'BPJS': Box(name='BPJS',accounts=[Box(company='PT PUP',account='Expense BPJS')],type='Earning',statistical_component=0,do_not_include_in_total=1,do_not_include_in_accounts=1),
+            'BPJS': Box(name='BPJS',accounts=[Box(company='PT PUP',account='Expense BPJS',pph21_noncash_payable_account='Liability BPJS')],type='Earning',statistical_component=0,do_not_include_in_total=1,do_not_include_in_accounts=1),
             'Basic': Box(type='Earning',statistical_component=0,do_not_include_in_total=0,do_not_include_in_accounts=0),
         }
         self.salary_components['Utang BPJS Perusahaan']=Box(name='Utang BPJS Perusahaan',type='Deduction',salary_component_abbr='UBPJS',do_not_include_in_total=1,do_not_include_in_accounts=0,accounts=[Box(company='PT PUP',account='Liability BPJS')])
@@ -64,7 +63,7 @@ class Environment:
         self.setup.is_tax_component = lambda name: name in self.setup.settings_components(self.settings).values()
         self.setup.component_role = lambda name: 'PPh21 Utang Noncash' if str(name).startswith('PPh21 Utang Noncash [') else next((b for b in COMPONENTS if name == b or str(name).startswith(b+' [')),None)
         self.setup.settings_components = lambda settings: {ALLOWANCE:settings.allowance_component,TAX:settings.withholding_component,REFUND:settings.refund_component}
-        helper_names={'noncash_component_name','component_account','validate_noncash_account','validate_noncash_component'}
+        helper_names={'noncash_accounts','noncash_component_name','component_account','validate_noncash_account','validate_noncash_component'}
         tree=ast.parse((ROOT/'frappe_hr_pph21/setup.py').read_text())
         ns={'frappe':self.frappe,'sha256':sha256,'NONCASH_OFFSET':'PPh21 Utang Noncash','component_role':self.setup.component_role,'is_tax_component':self.setup.is_tax_component}
         exec(compile(ast.Module(body=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in helper_names],type_ignores=[]),'setup.py','exec'),ns)
@@ -305,18 +304,17 @@ class V15AdapterTest(unittest.TestCase):
         self.assertEqual(detail['additional_salary'],'ADDITIONAL-TEST')
         self.assertEqual(detail['do_not_include_in_accounts'],0)
 
-    def test_noncash_offsets_match_actual_prorata_and_multiple_additional_rows(self):
+    def test_direct_ledger_matches_actual_prorata_and_multiple_additional_rows(self):
         mapping=self.noncash_mapping();self.env.settings.component_mapping.append(mapping)
         self.slip.payment_days=15
         self.slip.templates['earnings'] += [row('BPJS',400000,1),row('BPJS',100000,0)]
         self.slip.templates['earnings'][-1].additional_salary='EXTRA'
         s=self.calc();pairs=[r for r in s.deductions if r.salary_component==mapping.noncash_offset_component]
-        self.assertEqual(len(pairs),1);self.assertEqual(pairs[0].amount,300000)
-        self.assertEqual((pairs[0].do_not_include_in_total,pairs[0].do_not_include_in_accounts),(1,0))
+        self.assertEqual(pairs,[])
         self.assertEqual(s.net_pay,5000000)
         self.assertEqual(s.pph21_tax_base,5300000)
         self.assertEqual(json.loads(s.pph21_tax_snapshot)['noncash_accounting'][0]['amount'],'300000.0')
-        self.calc();self.assertEqual(len([r for r in s.deductions if r.salary_component==mapping.noncash_offset_component]),1)
+        self.calc();self.assertEqual(len([r for r in s.deductions if r.salary_component==mapping.noncash_offset_component]),0)
 
     def test_non_taxable_noncash_is_journalled_without_increasing_tax_or_net_pay(self):
         self.env.settings.component_mapping.append(self.noncash_mapping(treatment='Non Taxable'))
@@ -325,28 +323,28 @@ class V15AdapterTest(unittest.TestCase):
         self.assertEqual((s.pph21_tax_base,s.net_pay),(10000000,10000000))
         self.assertEqual(json.loads(s.pph21_tax_snapshot)['noncash_accounting'][0]['payable_account'],'Liability BPJS')
 
-    def test_multiple_sources_share_one_pair_and_keep_source_audit_rows(self):
+    def test_multiple_sources_share_payable_account_without_pair_and_keep_audit_rows(self):
         a=self.noncash_mapping();b=self.noncash_mapping('BPJS Pension',treatment='Non Taxable')
         self.env.settings.component_mapping += [a,b]
         self.env.salary_components['BPJS Pension']=Box(self.env.salary_components['BPJS'],name='BPJS Pension')
         self.slip.templates['earnings'] += [row('BPJS',400000,0),row('BPJS Pension',80000,0)]
         s=self.calc()
         pairs=[r for r in s.deductions if r.salary_component==a.noncash_offset_component]
-        self.assertEqual(len(pairs),1);self.assertEqual(pairs[0].amount,480000)
+        self.assertEqual(pairs,[])
         self.assertEqual(s.pph21_tax_base,10400000);self.assertEqual(s.net_pay,10000000)
         ledger=json.loads(s.pph21_tax_snapshot)['noncash_accounting']
         self.assertEqual(len(ledger),2)
-        self.calc();self.assertEqual(len([r for r in s.deductions if r.salary_component==a.noncash_offset_component]),1)
+        self.calc();self.assertEqual(len([r for r in s.deductions if r.salary_component==a.noncash_offset_component]),0)
 
-    def test_unposted_draft_switches_pair_without_retaining_old_output(self):
+    def test_unposted_legacy_draft_removes_pair_and_uses_direct_account(self):
         mapping=self.noncash_mapping();self.env.settings.component_mapping.append(mapping)
         self.slip.templates['earnings'].append(row('BPJS',480000,0))
-        s=self.calc();old=mapping.noncash_offset_component
-        self.env.salary_components['New Pair']=Box(copy.deepcopy(self.env.salary_components[old]),name='New Pair')
-        mapping.noncash_offset_component='New Pair'
-        self.calc()
-        self.assertNotIn(old,[r.salary_component for r in s.deductions])
-        self.assertEqual(len([r for r in s.deductions if r.salary_component=='New Pair']),1)
+        self.slip.deductions=[row('Old Manual Pair',480000,0)]
+        self.slip.pph21_tax_snapshot=json.dumps({'noncash_accounting':[{'offset_component':'Old Manual Pair'}]})
+        s=self.calc()
+        self.assertNotIn('Old Manual Pair',[r.salary_component for r in s.deductions])
+        self.assertNotIn(mapping.noncash_offset_component,[r.salary_component for r in s.deductions])
+        self.assertEqual(json.loads(s.pph21_tax_snapshot)['noncash_accounting_mode'],'direct_accounts')
         self.assertEqual(s.net_pay,10000000)
 
     def test_existing_structure_and_additional_pair_inputs_are_rejected(self):
@@ -359,29 +357,28 @@ class V15AdapterTest(unittest.TestCase):
         self.slip.templates['deductions']=[extra]
         with self.assertRaisesRegex(ValueError,'Additional Salary'): self.calc()
 
-    def test_pair_master_is_validated_again_and_locked_on_submit(self):
-        mapping=self.noncash_mapping();self.env.settings.component_mapping.append(mapping)
+    def test_direct_source_and_accounts_are_locked_and_revalidated_on_submit(self):
+        self.env.settings.component_mapping.append(self.noncash_mapping())
         self.slip.templates['earnings'].append(row('BPJS',480000,0));self.calc()
-        pair=self.env.salary_components[mapping.noncash_offset_component]
-        pair.do_not_include_in_total=0
-        with self.assertRaisesRegex(ValueError,'potongan tunai'): self.calc()
-        pair.do_not_include_in_total=1
+        source=self.env.salary_components['BPJS']
+        source.accounts[0].pph21_noncash_payable_account='Expense Wrong'
+        with self.assertRaisesRegex(ValueError,'Liability'): self.calc()
+        source.accounts[0].pph21_noncash_payable_account='Liability BPJS'
         original=self.env.frappe.get_doc;locked=[]
         def get_doc(dt,name,**kw):
             if kw.get('for_update'): locked.append((dt,name))
             return original(dt,name,**kw)
         self.env.frappe.get_doc=get_doc
         self.slip._pph21_locked=True;self.calc()
-        self.assertIn(('Salary Component',pair.name),locked)
+        self.assertIn(('Salary Component','BPJS'),locked)
         self.assertIn(('Account','Liability BPJS'),locked)
 
-    def test_missing_noncash_account_and_wrong_pair_cannot_silently_use_salary_payable(self):
+    def test_missing_direct_account_cannot_silently_use_salary_payable(self):
         self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Taxable Noncash'))
         self.slip.templates['earnings'].append(row('BPJS',480000,0))
-        with self.assertRaisesRegex(ValueError,'Komponen Pasangan Noncash.*PUP Standard'): self.calc()
-        self.env.settings.component_mapping[-1]=self.noncash_mapping()
-        name=self.env.settings.component_mapping[-1].noncash_offset_component
-        self.env.salary_components[name].accounts=[]
+        self.env.salary_components['BPJS'].accounts[0].pph21_noncash_payable_account=None
+        with self.assertRaisesRegex(ValueError,'Akun Utang Noncash'): self.calc()
+        self.env.salary_components['BPJS'].accounts=[]
         with self.assertRaisesRegex(ValueError,'tepat satu akun'): self.calc()
 
     def test_separate_benefit_accounting_and_unmapped_noncash_cannot_bypass_journal(self):
@@ -390,7 +387,9 @@ class V15AdapterTest(unittest.TestCase):
         self.env.salary_components['Basic'].only_tax_impact=0
         self.env.settings.component_mapping.append(Box(salary_component='BPJS',treatment='Non Taxable'))
         self.slip.templates['earnings'].append(row('BPJS',480000,0))
-        with self.assertRaisesRegex(ValueError,'pilih Komponen Pasangan'): self.calc()
+        self.calc()  # Non Taxable Earning noncash uses the account field without a pair.
+        self.env.settings.component_mapping.pop()
+        with self.assertRaisesRegex(ValueError,'petakan Earning noncash'): self.calc()
 
     def test_unmapped_component_rejected(self):
         self.env.settings.component_mapping=[]

@@ -4,6 +4,7 @@ from frappe.model.base_document import get_controller
 from frappe.tests.utils import FrappeTestCase
 
 from frappe_hr_pph21.overrides.salary_slip import PPh21SalarySlip
+from frappe_hr_pph21.overrides.payroll_entry import PPh21PayrollEntry
 from frappe_hr_pph21.setup import after_install
 
 
@@ -23,6 +24,8 @@ class TestPPh21Installation(FrappeTestCase):
         self.assertTrue(frappe.get_meta('Bulk PPh21 Employee Tax Profile').is_submittable)
         self.assertTrue(frappe.get_meta('PPh21 Component Tax Mapping').has_field('component_abbr'))
         self.assertTrue(issubclass(get_controller('Salary Slip'), PPh21SalarySlip))
+        self.assertTrue(issubclass(get_controller('Payroll Entry'), PPh21PayrollEntry))
+        self.assertTrue(frappe.get_meta('Salary Component Account').has_field('pph21_noncash_payable_account'))
 
     def test_install_does_not_create_components(self):
         original = set(frappe.get_all('Salary Component', pluck='name'))

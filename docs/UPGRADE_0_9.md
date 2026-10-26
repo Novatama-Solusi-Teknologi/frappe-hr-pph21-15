@@ -1,5 +1,8 @@
 # Upgrade 0.9.0 — komponen pajak pilihan pengguna
 
+> **Perubahan 0.10.0:** noncash memakai Akun Utang Noncash pada Accounts sumber, tanpa
+> komponen pasangan baru. Lihat [upgrade 0.10.0](UPGRADE_0_10.md). Dokumen ini mencatat versi sebelumnya.
+
 ## Perubahan
 
 App tidak lagi membuat Salary Component saat install, Save Settings, atau migrate.

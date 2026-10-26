@@ -202,3 +202,26 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
 - Submitted mengunci pilihan Settings dan akun master; Settings lain yang belum submitted
   tetap boleh memilih master bersama atau pembulatan sendiri.
 - Uji ulang Gross, Gross Up, final/refund, jurnal payroll serta Bank Entry di site staging.
+
+
+## Akun pasangan langsung — 0.10.0
+
+- Install/migrate menambahkan Akun Utang Noncash pada Salary Component Account. Filter
+  mengikuti Company baris; pergantian Company mengosongkan akun utang.
+- Satu sumber BPJS dengan satu baris Company memiliki Account Expense dan akun pasangan
+  Liability. Dua baris Company sama ditolak, bukan ditafsirkan debit/kredit.
+- Settings hanya memilih sumber/treatment; field pasangan lama hidden/read-only.
+- Hitung ulang draft legacy: baris pasangan hilang, sumber/nominal/THP tetap; snapshot
+  mencatat akun Expense/Liability langsung. Tidak ada master Salary Component baru.
+- Periksa jurnal Gross, Gross Up, refund, beberapa sumber dengan akun utang sama,
+  cost center, employee-wise accounting, serta pembayaran withheld/non-withheld.
+- Campurkan slip submitted versi lama dengan slip baru dalam uji Payroll Entry: jurnal
+  seimbang, tidak menggandakan kontribusi, Bank Entry = net gaji tunai.
+- Retry proses accrual setelah Journal Entry terhubung tidak membuat debit/kredit ulang.
+- Cancel/amend Payroll Entry/Salary Slip dan Journal Entry lewat HRMS; periksa pembalikan
+  seluruh beban/utang, penghapusan referensi sesuai standar, dan pembentukan ulang sekali.
+- Migrasi hanya menyalin akun yang unik. Konflik lintas Settings, akun duplikat/salah,
+  serta target berisi nilai berbeda tidak ditimpa; laporan private memuat alasannya.
+- Setelah submitted, perubahan akun source ditolak; akun snapshot untuk jurnal tidak
+  dibaca ulang dari master. Uji konkurensi submit/mengubah akun di bench nyata.
+- Periksa tidak ada app lain override Payroll Entry; integrasi diperlukan jika ada.

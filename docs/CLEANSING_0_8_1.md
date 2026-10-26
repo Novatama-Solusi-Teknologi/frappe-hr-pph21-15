@@ -1,5 +1,8 @@
 # Cleansing 0.8.1 — pasangan noncash otomatis lama
 
+> **Perubahan 0.10.0:** noncash memakai Akun Utang Noncash pada Accounts sumber, tanpa
+> komponen pasangan baru. Lihat [upgrade 0.10.0](UPGRADE_0_10.md). Dokumen ini mencatat versi sebelumnya.
+
 Rilis ini menambahkan pembersihan satu kali saat migrate, sesuai permintaan PT PUP karena
 belum ada Payroll Entry yang dibuat. Pemeriksaan tetap melihat pemakaian komponen secara
 langsung, karena Salary Structure atau Salary Slip bisa ada tanpa Payroll Entry.

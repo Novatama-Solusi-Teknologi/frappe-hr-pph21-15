@@ -287,3 +287,35 @@ Batas validasi: DB, permission/locking, File, dan persistensi Journal Entry masi
 test double. Migrate, tampilan Desk, dan posting jurnal nyata di Frappe Cloud belum diuji.
 Tidak ada commit/push/deploy atau perubahan master pada site. Pilihan/master pajak lama
 tidak dihapus/rename otomatis; patch cleansing noncash 0.8.1 tetap disertakan.
+
+
+## Rilis 0.10.0 — jurnal noncash langsung melalui akun pasangan
+
+Pemeriksaan 26 Oktober 2026: **160 tes Python dan 21 tes JavaScript lulus**. Pyflakes dan
+`git diff --check` lulus. Custom field Akun Utang Noncash berada di Salary Component Account,
+dengan filter Company per baris. Settings tidak meminta komponen pasangan; field legacy
+hidden/read-only. Slip baru menyimpan akun/nominal pada snapshot tanpa baris pasangan.
+
+Contract test memuat 11 metode asli Payroll Entry HRMS v15 yang sudah dipin, lalu
+menjalankan override baru app di atasnya. Uji Gross/Gross Up/refund, noncash nonobjek,
+beberapa sumber menuju akun sama, prorata/Additional Salary, pembagian cost center dan
+employee-wise accounting memastikan jurnal seimbang dan pembayaran bank = net gaji.
+Campuran slip direct/legacy/non-PPh21, pembayaran withheld, retry setelah referensi jurnal,
+serta pemakaian akun snapshot ketika master berubah juga diperiksa. Snapshot rusak,
+nominal tidak cocok, akun kosong, entri ganda dan mode baru yang hilang ditolak.
+
+Migrasi diuji untuk akun unik, pengulangan tanpa efek tambahan, konflik lintas Settings,
+Company ganda, target manual berbeda, serta site tanpa mapping lama. Akun hanya disalin
+bila tidak ambigu; private File mencatat copied/skipped. Patch didaftarkan sebelum cleanup
+0.8.1 agar upgrade lompat versi tidak kehilangan referensi akun sebelum backfill.
+
+PDF 0.10.0 sebanyak 14 halaman dirender dan diperiksa visual, termasuk contoh dua akun
+dalam satu baris Accounts dan jurnal BPJS. Mesin pajak serta tarif tidak diubah. Wheel,
+sdist dan source ZIP disiapkan serta diperiksa memuat override, script, patch, dan PDF baru.
+
+Batas: seleksi database/persistensi File dan Journal Entry memakai test double. Belum
+menjalankan migrate, UI Desk, permission/locking database nyata, cancel/amend Journal Entry,
+atau posting pada bench lengkap/Frappe Cloud PT PUP. Jalur pembatalan/referensi tetap
+mendelegasikan ke HRMS; pengujian langsung tetap diperlukan sesuai UAT.md. Tidak ada
+commit/push/deploy atau penulisan ke site produksi. App kini juga override Payroll Entry;
+check_versions memblokir konflik override dengan app lain.

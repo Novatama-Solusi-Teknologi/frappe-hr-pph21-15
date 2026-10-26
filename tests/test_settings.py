@@ -131,8 +131,6 @@ class SettingsTest(unittest.TestCase):
         s=self.settings()
         s.component_mapping=[Box(salary_component=s.allowance_component,treatment='Taxable Cash')]
         with self.assertRaisesRegex(ValueError,'sumber mapping'): s.validate()
-        s.component_mapping=[Box(salary_component='BPJS',treatment='Taxable Noncash',noncash_offset_component=s.withholding_component)]
-        with self.assertRaisesRegex(ValueError,'pasangan noncash'): s.validate()
         s.component_mapping=[]
         other=self.noncash_settings('B')
         name=other.component_mapping[0].noncash_offset_component
@@ -182,7 +180,7 @@ class SettingsTest(unittest.TestCase):
         s=self.settings(name)
         STORE['BPJS']=Component(name='BPJS',type='Earning',salary_component_abbr='BPJS',
             do_not_include_in_total=1,do_not_include_in_accounts=1,statistical_component=0,
-            variable_based_on_taxable_salary=0,accounts=[Box(company='PUP',account='Expense BPJS')])
+            variable_based_on_taxable_salary=0,accounts=[Box(company='PUP',account='Expense BPJS',pph21_noncash_payable_account='Liability BPJS')])
         pair='Utang BPJS Perusahaan'
         if pair not in STORE:
             STORE[pair]=Component(name=pair,type='Deduction',salary_component_abbr='UBPJS',do_not_include_in_total=1,
@@ -348,10 +346,10 @@ class SettingsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'satu baris'):
             self.validation.validate_generated_component(c)
 
-    def test_manual_pair_is_required_and_no_pair_is_created_during_save(self):
+    def test_direct_account_replaces_pair_requirement_without_creating_masters(self):
         s=self.noncash_settings();s.component_mapping[0].noncash_offset_component=None
         before=set(STORE)
-        with self.assertRaisesRegex(ValueError,'pilih Komponen Pasangan'): s.validate()
+        s.validate()  # No counterpart is required; the source has its payable account.
         self.assertEqual(set(STORE),before)
         self.assertFalse(any(n.startswith(self.setup.NONCASH_OFFSET) for n in STORE))
 
@@ -361,15 +359,16 @@ class SettingsTest(unittest.TestCase):
                             ('depends_on_payment_days',1),('formula','base * 0.01'),('condition','1'),('amount',10),
                             ('disabled',1),('statistical_component',1),('is_tax_applicable',1)]:
             original=pair.get(field);pair[field]=value
-            with self.subTest(field=field),self.assertRaises(ValueError): s.validate()
+            with self.subTest(field=field),self.assertRaises(ValueError): self.setup.validate_noncash_component(pair.name)
             pair[field]=original
         s.component_mapping[0].noncash_offset_component=s.withholding_component
-        with self.assertRaisesRegex(ValueError,'Komponen pajak'): s.validate()
+        with self.assertRaisesRegex(ValueError,'Komponen pajak'): self.setup.validate_noncash_component(s.withholding_component)
 
     def test_selected_pair_cannot_also_be_tax_mapping_source(self):
         s=self.noncash_settings();pair=s.component_mapping[0].noncash_offset_component
         s.component_mapping.append(Box(salary_component=pair,treatment='Ignore'))
-        with self.assertRaisesRegex(ValueError,'sekaligus'): s.validate()
+        with self.assertRaisesRegex(ValueError,'diisi oleh app'):
+            self.validation.validate_salary_structure(Doc(deductions=[Box(salary_component=pair)]))
 
     def test_selected_pair_link_and_master_are_locked_after_submitted(self):
         s=self.noncash_settings();s._old=Doc(copy.deepcopy(s));self.posted.add(s.name)
@@ -391,6 +390,25 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(row.noncash_offset_component,name)
         self.assertEqual(set(STORE),before)
         self.assertEqual(legacy.accounts[0].account,'Liability BPJS')
+
+    def test_direct_payable_account_is_required_and_locked_after_submitted(self):
+        s=self.noncash_settings();s.component_mapping[0].noncash_offset_component=None
+        source=STORE['BPJS'];s.validate()
+        source.accounts[0].pph21_noncash_payable_account=None
+        with self.assertRaisesRegex(ValueError,'Akun Utang Noncash'): s.validate()
+        source.accounts[0].pph21_noncash_payable_account='Liability BPJS'
+        source._old=Doc(copy.deepcopy(source));self.posted.add(source.name)
+        source.accounts[0].pph21_noncash_payable_account='Liability Different'
+        with self.assertRaisesRegex(ValueError,'dikunci'): self.validation.validate_generated_component(source)
+        source.accounts[0].pph21_noncash_payable_account=None
+        with self.assertRaisesRegex(ValueError,'dikunci'): self.validation.validate_generated_component(source)
+
+    def test_noncash_custom_field_is_on_per_company_account_row(self):
+        captured={};self.setup.create_custom_fields=lambda fields,**kw: captured.update(fields)
+        self.setup.sync_custom_fields()
+        f=captured['Salary Component Account'][0]
+        self.assertEqual((f['fieldname'],f['options']),('pph21_noncash_payable_account','Account'))
+        self.assertEqual(f['insert_after'],'account')
 
     def test_after_migrate_never_creates_or_backfills_noncash_pairs(self):
         calls=[]
