@@ -1,6 +1,6 @@
 # PPh 21 — ERPNext / Frappe HR v15
 
-Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.10.0**, kandidat untuk uji staging.
+Custom app PPh 21 Indonesia untuk PT PUP. Rilis **0.10.1**, kandidat untuk uji staging.
 
 Nama tampilan: **PPh 21**. Menu default: **HR > PPh 21**. Nama repository: `frappe-hr-pph21`.
 Nama teknis app, metadata project, dan Python package: `frappe_hr_pph21`; gunakan nama dengan underscore
@@ -21,7 +21,15 @@ Memerlukan **Frappe v15 + ERPNext v15 + HRMS v15**, Python 3.10+, dan perusahaan
 - Hitung ulang idempotent, proteksi duplikasi masa, dan pembatalan dari bulan terbaru.
 - Aktivasi per pegawai dan perusahaan; instalasi tidak mengaktifkan payroll otomatis.
 
-## Baru di 0.10.0: noncash hanya membutuhkan akun pasangan
+## Baru di 0.10.1: tombol Hitung Ulang PPh21
+
+Pada Salary Slip draft yang sudah tersimpan dan memiliki profil PPh21, pengguna dengan
+izin Write dapat menekan **Hitung Ulang PPh21** setelah menambah komponen manual.
+Tombol menyimpan perubahan form melalui validasi HRMS, menghitung ulang pajak, total,
+dan kertas kerja di server. Tetap berfungsi pada draft tanpa perubahan untuk membaca
+Settings terbaru. Komponen manual wajib dipetakan di Settings. [Cara penggunaan](docs/KONFIGURASI.md#hitung-ulang-pph21-pada-draft).
+
+## Riwayat 0.10.0: noncash hanya membutuhkan akun pasangan
 
 Pada **Salary Component > Accounts**, gunakan satu baris per Company:
 **Account** untuk akun beban dan **Akun Utang Noncash** untuk akun utang.

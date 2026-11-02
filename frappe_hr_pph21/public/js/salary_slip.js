@@ -1,4 +1,4 @@
-/* Display saved tax calculations; never recalculate tax in the browser. */
+/* Display saved tax calculations. Recalculation uses the normal server-side Save. */
 (() => {
     const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const escape = value => frappe.utils.escape_html(String(value ?? "—"));
@@ -112,8 +112,38 @@
         </article>`;
     }
     frappe.hr_pph21_worksheet = {read, render};
+    const can_recalculate = frm => frm.doc.docstatus === 0
+        && !!frm.doc.pph21_tax_profile && !frm.is_new()
+        && !!frm.perm?.[0]?.write && !frm.save_disabled;
+    async function recalculate(frm) {
+        if (!can_recalculate(frm) || frm.__pph21_recalculating) return;
+        frm.__pph21_recalculating = true;
+        try {
+            // v15 leaves the Save promise pending when mandatory fields are missing.
+            // Check first so fixing a missing field does not leave this action busy.
+            if (!frappe.ui.form.check_mandatory(frm)) return;
+            // Force validation even for an unchanged draft (e.g. Settings changed).
+            // Save sends the current form, including unsaved manual component rows.
+            // Do not reload first or fetch the structure, which would discard edits.
+            frm.dirty();
+            let saved = false;
+            await frm.save("Save", response => { saved = !response.exc; }, null, () => {});
+            // v15 frm.save can swallow errors; success must come from its callback.
+            if (saved && !frm.is_dirty() && frm.doc.pph21_tax_snapshot) {
+                frappe.show_alert({
+                    message: __("PPh21 berhasil dihitung ulang dan Salary Slip disimpan sebagai draft."),
+                    indicator: "green",
+                });
+            }
+        } finally {
+            frm.__pph21_recalculating = false;
+        }
+    }
     frappe.ui.form.on("Salary Slip", {
         refresh(frm) {
+            if (can_recalculate(frm)) {
+                frm.add_custom_button(__("Hitung Ulang PPh21"), () => recalculate(frm));
+            }
             frm.set_df_property("pph21_tax_snapshot", "hidden", 1);
             const wrapper = frm.fields_dict.pph21_tax_worksheet?.$wrapper;
             if (!frm.doc.pph21_tax_snapshot) {

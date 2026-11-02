@@ -2,6 +2,7 @@
 Not a substitute for bench installation/SQL/GL integration tests.
 """
 import ast
+from contextlib import contextmanager, ExitStack
 from datetime import date
 from decimal import Decimal
 import importlib.util
@@ -132,6 +133,75 @@ class V15AdapterTest(unittest.TestCase):
         return Box(salary_component=name,treatment=treatment,noncash_payable_account='Liability BPJS',
                    noncash_offset_component='Utang BPJS Perusahaan')
     def calc(self): self.slip.calculate_net_pay();return self.slip
+
+    @contextmanager
+    def native_component_pipeline(self):
+        """Use v15 row updates (not the template-replacement stub) for manual edits."""
+        tree=ast.parse(Path(SOURCE).read_text())
+        cls=next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='SalarySlip')
+        names={'calculate_component_amounts','add_structure_components','add_structure_component'}
+        methods=[n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name in names]
+        self.assertEqual(len(methods),len(names))
+        ns={'frappe':self.env.frappe,'flt':flt,'cint':lambda x:int(x or 0)}
+        exec(compile(ast.Module(body=methods,type_ignores=[]),SOURCE,'exec'),ns)
+        parent=type(self.slip).__bases__[0]
+        self.slip._salary_structure_doc=Box(self.slip.templates,salary_component=None)
+        with ExitStack() as stack:
+            for name in names: stack.enter_context(patch.object(parent,name,ns[name],create=True))
+            # Formula values/benefits/external Additional Salary lookup are service stubs.
+            for name,fn in {
+                'get_data_for_eval':lambda doc: ({},{}),
+                'eval_condition_and_formula':lambda doc,r,data:r.amount,
+                'add_additional_salary_components':lambda doc,table:None,
+                'add_employee_benefits':lambda doc:None,
+            }.items(): stack.enter_context(patch.object(parent,name,fn,create=True))
+            stack.enter_context(patch.object(self.env.frappe,'get_cached_value',lambda *args:1,create=True))
+            yield
+
+    def test_manual_bonus_survives_native_recalculation_edit_delete_and_locked_submit(self):
+        for method in ('Gross','Gross Up'):
+            with self.subTest(method=method), self.native_component_pipeline():
+                self.env.profile.method=method
+                self.env.settings.component_mapping=[Box(salary_component='Basic',treatment='Taxable Cash'),
+                    Box(salary_component='Manual Bonus',treatment='Taxable Cash')]
+                self.slip.earnings=[];self.slip.deductions=[]
+                self.calc()
+                bonus=row('Manual Bonus',1000000,0);bonus.default_amount=0
+                self.slip.earnings.append(bonus)
+                for amount in (1000000,2500000,0):
+                    bonus.amount=amount;s=self.calc();snapshot=s.pph21_tax_snapshot
+                    expected=monthly(10000000+amount,'TK/0',method)
+                    self.assertEqual(s.pph21_tax_base,10000000+amount)
+                    self.assertEqual(s.pph21_tax_withholding,expected.withholding)
+                    self.assertIs(next(r for r in s.earnings if r.salary_component=='Manual Bonus'),bonus)
+                    self.calc();self.assertEqual(s.pph21_tax_snapshot,snapshot)
+                    self.assertEqual(sum(r.salary_component==TAX for r in s.deductions),1)
+                self.slip.earnings.remove(bonus);s=self.calc()
+                self.assertEqual(s.pph21_tax_base,10000000)
+                self.slip.earnings.append(bonus);bonus.amount=1000000
+                s.before_submit();self.assertEqual(s.pph21_tax_base,11000000)
+
+    def test_manual_noncash_and_deduction_recalculate_without_double_prorata(self):
+        with self.native_component_pipeline():
+            self.slip.payment_days=21
+            self.env.settings.component_mapping.extend([self.noncash_mapping(),
+                Box(salary_component='JHT',treatment='Annual Deduction')])
+            self.env.salary_components['JHT']=Box(type='Deduction',do_not_include_in_total=0)
+            self.calc()
+            noncash=row('BPJS',480000,0);noncash.default_amount=0
+            jht=row('JHT',200000,0);jht.default_amount=0
+            self.slip.earnings.append(noncash);self.slip.deductions.append(jht)
+            s=self.calc();snapshot=s.pph21_tax_snapshot
+            self.assertEqual((s.pph21_tax_base,s.pph21_tax_deductions,s.net_pay),(7480000,200000,6800000))
+            self.assertEqual(json.loads(snapshot)['noncash_accounting'][0]['amount'],'480000.0')
+            self.calc();self.assertEqual(s.pph21_tax_snapshot,snapshot)
+
+    def test_manual_unmapped_component_is_rejected_not_silently_excluded(self):
+        with self.native_component_pipeline():
+            self.calc();self.slip.earnings.append(row('Unmapped Bonus',1000000,0))
+            with self.assertRaisesRegex(ValueError,'Petakan komponen Unmapped Bonus'):
+                self.calc()
+
     def select_manual_tax_components(self, suffix=''):
         for role,field,name,abbr in [(ALLOWANCE,'allowance_component','Tunjangan PPh21','TP'),
                 (TAX,'withholding_component','PPh21','PPH'),(REFUND,'refund_component','Refund PPh21','RP')]:

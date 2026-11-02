@@ -225,3 +225,25 @@ penanggung jawab payroll. Cocokkan juga format/pembulatan dengan pelaporan pajak
 - Setelah submitted, perubahan akun source ditolak; akun snapshot untuk jurnal tidak
   dibaca ulang dari master. Uji konkurensi submit/mengubah akun di bench nyata.
 - Periksa tidak ada app lain override Payroll Entry; integrasi diperlukan jika ada.
+
+## Tambahan UAT 0.10.1: Hitung Ulang PPh21 pada draft
+
+- Buka draft PPh21 dari Payroll Entry dengan pengguna Write Salary Slip. Tombol
+  **Hitung Ulang PPh21** tersedia; Submitted, Cancelled dan pengguna read-only tidak.
+- Tambahkan komponen bonus manual yang tidak berasal dari struktur, isi Rp1.000.000,
+  dan klik tombol tanpa Save terlebih dahulu. Bonus tetap ada, pajak/Net Pay/kertas
+  kerja tersimpan sesuai bruto baru. Uji metode Gross dan Gross Up.
+- Ubah bonus menjadi Rp2.500.000, lalu nol, lalu hapus barisnya. Ulangi perhitungan
+  setiap kali; tidak boleh ada tunjangan/potongan pajak duplikat.
+- Uji pada gaji prorata, tambahan noncash dan potongan JHT/JP manual. Pastikan noncash
+  tidak menambah THP dan akun pasangan tetap tercatat di kertas kerja.
+- Tanpa mengubah draft, ubah mapping yang masih boleh diedit, kemudian klik tombol.
+  Kertas kerja harus memakai mapping terbaru.
+- Komponen belum dipetakan: tampil pesan yang menyebut nama komponen; draft form
+  tetap dapat diperbaiki. Lengkapi mapping lalu coba lagi. Ulangi untuk field wajib
+  kosong, kegagalan izin dan konflik perubahan dari sesi lain; jangan tampil sukses.
+- Klik cepat dua kali: hanya satu Save berjalan. Setelah berhasil, status tetap
+  Draft dan tidak ada Journal Entry baru. Submit berikutnya menghitung ulang lewat
+  validasi server yang sama.
+- Formula Salary Structure/Additional Salary tetap mengikuti sumbernya. Periksa
+  bahwa pengguna memakai komponen manual terpisah untuk tambahan di luar struktur.

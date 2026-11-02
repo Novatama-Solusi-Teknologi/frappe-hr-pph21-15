@@ -1,4 +1,4 @@
-# Konfigurasi PT PUP - rilis 0.10.0
+# Konfigurasi PT PUP - rilis 0.10.1
 
 Form master memakai 2-3 kolom; tabel mapping tetap selebar form.
 Profil massal dapat dibuat melalui [Bulk PPh21 Employee Tax Profile](BULK_PROFILE.md).
@@ -170,6 +170,37 @@ kertas kerja pajak bulan tetap satu slip gabungan. App ini belum mengelola pajak
 Hapus komponen income tax lama dari struktur pegawai yang memakai PPh21. Jangan menggunakan
 Variable Based On Taxable Salary untuk komponen pajak PPh21. Pegawai tanpa PPh21 Enabled
 mempertahankan kalkulasi native; pegawai PPh21 membutuhkan Settings yang aktif.
+
+### Hitung ulang PPh21 pada draft
+
+Mulai 0.10.1, buka detail Salary Slip draft dari Payroll Entry, lalu:
+
+1. Tambahkan komponen manual dan isi nominalnya pada Earnings/Deductions. Pastikan
+   komponen tersebut sudah dipetakan di PPh21 Settings yang dipakai profil pegawai.
+2. Klik **Hitung Ulang PPh21**. Perubahan yang belum disimpan ikut disimpan sebagai
+   draft. Tidak perlu menekan Save terlebih dahulu. Tombol juga dapat dipakai pada
+   draft tanpa perubahan, misalnya setelah mapping Settings diperbarui.
+3. Periksa komponen pajak, Gross Pay, Total Deduction, Net Pay, serta Kertas Kerja PPh21.
+
+Tombol hanya tersedia untuk slip yang sudah tersimpan, memiliki profil PPh21,
+berstatus Draft, dan dapat ditulis oleh pengguna. Slip baru mendapat perhitungan
+pertama saat Save. Submitted/Cancelled tidak mendapat tombol ini. Validasi dan
+izin Save standar tetap berlaku; bila mapping belum lengkap, lengkapi lalu ulangi.
+Tidak ada submit atau jurnal yang dibuat oleh tombol.
+
+Gunakan komponen manual tersendiri untuk tambahan di luar struktur. Komponen yang
+berasal dari formula Salary Structure atau Additional Salary tetap dihitung ulang
+sesuai sumbernya oleh HRMS; tombol ini bukan pengunci override nominal komponen
+berformula. Nominal manual yang dimasukkan langsung adalah nominal aktual slip.
+Komponen pajak otomatis diganti dengan hasil terbaru, sehingga klik berulang tidak
+menambah duplikat tunjangan/potongan pajak. Masa pajak tetap mengikuti Posting Date.
+
+Contoh: tambahkan bonus manual Rp1.000.000 (Taxable Cash) pada gaji Rp10.000.000,
+lalu hitung ulang. Bruto sebelum tunjangan PPh21 menjadi Rp11.000.000. Untuk Gross Up,
+tunjangan dan potongan pajak dihitung kembali atas bruto baru; bonus tetap ada pada slip.
+
+Deploy source 0.10.1, jalankan migrate/build assets, lalu reload Desk untuk memuat
+tombol baru. Tidak ada patch data baru pada rilis ini.
 
 ## 6. Masa terakhir dan pengembalian
 
